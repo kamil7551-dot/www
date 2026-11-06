@@ -5,6 +5,25 @@ Zadania odhaczamy w PR, który je zamyka. Zmiany kolejności zatwierdza Kamil.
 
 Pełna ocena pomysłu i architektura: [dokument projektu](https://claude.ai/artifact/MQCr8bZV7ScUbe2VGk5Rdr).
 
+## W toku
+
+Kto teraz nad czym pracuje. Agent wpisuje się tutaj **przed** rozpoczęciem pracy, w pierwszym commicie swojej gałęzi, i usuwa wiersz w PR, który kończy zadanie.
+Jeśli zadanie jest już tu zajęte przez kogoś innego, nie zaczynaj go: wybierz inne albo zapytaj.
+
+| Zadanie (z etapów poniżej) | Agent | Gałąź | Od kiedy | Uwagi |
+| --- | --- | --- | --- | --- |
+| _brak_ | | | | |
+
+## Dziennik prac
+
+Co zostało zrobione, najnowsze na górze. Jeden wiersz na każdy zmergowany PR, dopisywany w tym samym PR.
+Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto wiedzieć, co zostało do zrobienia, na co uważać.
+
+| Data | Agent | Co zrobiono | PR / commit | Dla następnych |
+| --- | --- | --- | --- | --- |
+| 2026-11-06 | Claude | Dodano tabelę „W toku” i dziennik prac | PR `docs/work-log` | Wypełniaj obie tabele zgodnie z AGENTS.md, sekcja „Zapisywanie pracy” |
+| 2026-11-06 | Claude | Dodano AGENTS.md, ROADMAP.md, INSTRUCTIONS.md | commit startowy na `main` | Następne zadanie: szkielet projektu z etapu 0 |
+
 ## Etap 0: Fundamenty
 
 Cel: puste, ale działające repozytorium, w którym każdy agent może bezpiecznie pracować.
