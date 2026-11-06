@@ -28,3 +28,6 @@ export type { CoreEvents, EventName } from "./events";
 export { ModuleRegistry, defineModule } from "./modules";
 export type { ModuleDefinition } from "./modules";
 export { slugify } from "./slug";
+export { Media, MediaError, IMAGE_TYPES, MAX_IMAGE_BYTES } from "./media";
+export { resolveTenant } from "./tenants";
+export type { SiteKind, Tenant } from "./tenants";

@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-06 | Claude | Rozpoznawanie sklepu po adresie (`<slug>.PLATFORM_DOMAIN` i tabela `tenant_domains`), zdjęcia w R2 (`core/media.ts`, klucze z prefiksem `tenant_id`), prosta strona główna sklepu z listą aktywnych pozycji | PR `feat/core-catalog` | Lokalnie sklep działa pod `http://<slug>.localhost:8787`. Sklep rozpoznajemy z URL żądania, nie z nagłówka Host. Strona główna to na razie surowy HTML bez szablonu; szablony w etapie 2. Rozpoznawanie sklepu warto później cache'ować w KV |
 | 2026-11-06 | Claude | Rdzeń: katalog (pozycje i kategorie), `TenantDb` z wymuszonym `tenant_id`, szyna zdarzeń, rejestr modułów z włączaniem per sklep | PR `feat/core-catalog` | Ceny w groszach (liczby całkowite). SQL w rdzeniu: `?1` to zawsze `tenant_id`, pozostałe parametry od `?2`. Zdarzenia na razie `item.*` i `category.created`; zamówienia dojdą w etapie 4. Moduły w testach przez `test/core-under-test.ts`. Następne: zdjęcia w R2, panel, rozpoznawanie sklepu po adresie |
 | 2026-11-06 | Claude | Szkielet projektu: Hono na Workers, D1 z pierwszą migracją (`tenants`), Vitest, ESLint, CI, szablon PR | PR `feat/infra-scaffold` | `worker-configuration.d.ts` nie jest w repo, generuje go `pnpm types` (uruchamiane automatycznie przez typecheck i test). `database_id` w wrangler.jsonc to atrapa do czasu pierwszego wdrożenia. Następne: etap 1, model danych katalogu |
 | 2026-11-06 | Claude | Dodano tabelę „W toku” i dziennik prac | PR `docs/work-log` | Wypełniaj obie tabele zgodnie z AGENTS.md, sekcja „Zapisywanie pracy” |
@@ -44,9 +45,10 @@ Cel: jeden silnik, na którym stoją wszystkie rodzaje stron.
 - [x] Warstwa danych z automatycznym `tenant_id`
 - [x] Szyna zdarzeń i rejestr modułów (`defineModule`, hooki, zależności, ustawienia, włączanie per sklep)
 - [ ] Sloty: fragmenty modułów wstawiane do stron sklepu
-- [ ] Upload zdjęć do R2 i serwowanie w odpowiednich rozmiarach
+- [x] Zapis zdjęć w R2 i serwowanie z cache (tylko właścicielowi)
+- [ ] Zdjęcia w kilku rozmiarach (miniatury) i upload z panelu
 - [ ] Panel sprzedawcy: logowanie, dodawanie i edycja pozycji, ustawienia sklepu
-- [ ] Rozpoznawanie sklepu po adresie (subdomena, później własna domena)
+- [x] Rozpoznawanie sklepu po adresie (subdomena i własna domena)
 
 ## Etap 2: Wizytówka
 
