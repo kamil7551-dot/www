@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-06 | Claude | Rdzeń: katalog (pozycje i kategorie), `TenantDb` z wymuszonym `tenant_id`, szyna zdarzeń, rejestr modułów z włączaniem per sklep | PR `feat/core-catalog` | Ceny w groszach (liczby całkowite). SQL w rdzeniu: `?1` to zawsze `tenant_id`, pozostałe parametry od `?2`. Zdarzenia na razie `item.*` i `category.created`; zamówienia dojdą w etapie 4. Moduły w testach przez `test/core-under-test.ts`. Następne: zdjęcia w R2, panel, rozpoznawanie sklepu po adresie |
 | 2026-11-06 | Claude | Szkielet projektu: Hono na Workers, D1 z pierwszą migracją (`tenants`), Vitest, ESLint, CI, szablon PR | PR `feat/infra-scaffold` | `worker-configuration.d.ts` nie jest w repo, generuje go `pnpm types` (uruchamiane automatycznie przez typecheck i test). `database_id` w wrangler.jsonc to atrapa do czasu pierwszego wdrożenia. Następne: etap 1, model danych katalogu |
 | 2026-11-06 | Claude | Dodano tabelę „W toku” i dziennik prac | PR `docs/work-log` | Wypełniaj obie tabele zgodnie z AGENTS.md, sekcja „Zapisywanie pracy” |
 | 2026-11-06 | Claude | Dodano AGENTS.md, ROADMAP.md, INSTRUCTIONS.md | commit startowy na `main` | Następne zadanie: szkielet projektu z etapu 0 |
@@ -39,9 +40,10 @@ Cel: puste, ale działające repozytorium, w którym każdy agent może bezpiecz
 
 Cel: jeden silnik, na którym stoją wszystkie rodzaje stron.
 
-- [ ] Model danych: tenanci (sklepy), pozycje katalogu (produkt, usługa, danie), kategorie, zdjęcia
-- [ ] Warstwa danych z automatycznym `tenant_id`
-- [ ] Szyna zdarzeń i rejestr modułów (`defineModule`, hooki, sloty, ustawienia)
+- [x] Model danych: tenanci (sklepy), pozycje katalogu (produkt, usługa, danie), kategorie
+- [x] Warstwa danych z automatycznym `tenant_id`
+- [x] Szyna zdarzeń i rejestr modułów (`defineModule`, hooki, zależności, ustawienia, włączanie per sklep)
+- [ ] Sloty: fragmenty modułów wstawiane do stron sklepu
 - [ ] Upload zdjęć do R2 i serwowanie w odpowiednich rozmiarach
 - [ ] Panel sprzedawcy: logowanie, dodawanie i edycja pozycji, ustawienia sklepu
 - [ ] Rozpoznawanie sklepu po adresie (subdomena, później własna domena)

@@ -84,8 +84,11 @@ Zasady modułów:
 4. Moduł dodaje do strony klienta jak najmniej JS i CSS. Każdy dodany JS podaj w opisie PR (rozmiar po gzip).
 5. Teksty widoczne dla użytkownika idą przez pliki tłumaczeń (`pl` jako pierwszy język), nie są wpisane na sztywno.
 
-Zdarzenia rdzenia (lista będzie rosła, zmiany tylko przez PR do rdzenia):
-`product.created`, `product.updated`, `product.deleted`, `order.created`, `order.paid`, `order.shipped`, `order.cancelled`, `customer.created`, `page.render`.
+Zdarzenia rdzenia (pełna lista z typami w `core/events.ts`; zmiany tylko przez PR do rdzenia):
+- dostępne: `item.created`, `item.updated`, `item.deleted`, `category.created`,
+- planowane: `order.created`, `order.paid`, `order.shipped`, `order.cancelled`, `customer.created`, `page.render`.
+
+Zapytania SQL w rdzeniu idą przez `TenantDb` (`core/db.ts`): `?1` to zawsze `tenant_id`, kolejne parametry od `?2`. Zapytanie bez `tenant_id` zostanie odrzucone przed wykonaniem.
 
 ## Budżet wydajności strony klienta
 
