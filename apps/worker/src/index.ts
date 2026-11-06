@@ -1,54 +1,34 @@
 import { Hono } from "hono";
-import { html } from "hono/html";
-import { EventBus, Media, ModuleRegistry, forTenant, resolveTenant, type Tenant } from "../../../core";
+import { ConsoleMailer, EventBus, ModuleRegistry, ResendMailer, type Mailer, type Platform } from "../../../core";
+import { panelApp } from "./panel";
+import { storefrontApp } from "./storefront";
 
-const platform = { bus: new EventBus(), modules: new ModuleRegistry() };
-platform.modules.attach(platform.bus);
+export interface Deps {
+  mailer: (env: Env) => Mailer;
+}
 
-type AppEnv = { Bindings: Env; Variables: { tenant: Tenant } };
-const app = new Hono<AppEnv>();
+const defaultMailer = (env: Env): Mailer => {
+  const key = (env as Env & { RESEND_API_KEY?: string }).RESEND_API_KEY;
+  return key ? new ResendMailer(key, `Logowanie <no-reply@${env.PLATFORM_DOMAIN}>`) : new ConsoleMailer();
+};
 
-app.get("/health", async (c) => {
-  const row = await c.env.DB.prepare("SELECT count(*) AS tenants FROM tenants").first<{ tenants: number }>();
-  return c.json({ ok: true, tenants: row?.tenants ?? 0 });
-});
+export function createApp(deps: Deps = { mailer: defaultMailer }) {
+  const platform: Platform = { bus: new EventBus(), modules: new ModuleRegistry() };
+  platform.modules.attach(platform.bus);
+  const panel = panelApp(platform, deps.mailer);
+  const store = storefrontApp(platform);
 
-app.use("*", async (c, next) => {
-  const tenant = await resolveTenant(c.env.DB, new URL(c.req.url).host, c.env.PLATFORM_DOMAIN);
-  if (!tenant) return c.text("Nie znaleziono strony", 404);
-  c.set("tenant", tenant);
-  await next();
-});
+  const app = new Hono<{ Bindings: Env }>();
+  app.get("/health", async (c) => {
+    const row = await c.env.DB.prepare("SELECT count(*) AS tenants FROM tenants").first<{ tenants: number }>();
+    return c.json({ ok: true, tenants: row?.tenants ?? 0 });
+  });
+  // The panel lives only on panel.<platform domain>, so seller cookies never reach shop domains.
+  app.all("*", (c) => {
+    const isPanel = new URL(c.req.url).hostname === `panel.${c.env.PLATFORM_DOMAIN}`;
+    return (isPanel ? panel : store).fetch(c.req.raw, c.env, c.executionCtx);
+  });
+  return app;
+}
 
-app.get("/media/*", async (c) => {
-  const key = c.req.path.slice("/media/".length);
-  const object = await new Media(c.env.MEDIA, c.get("tenant").id).get(decodeURIComponent(key));
-  if (!object) return c.notFound();
-  const headers = new Headers({ "cache-control": "public, max-age=31536000, immutable", etag: object.httpEtag });
-  object.writeHttpMetadata(headers);
-  return new Response(object.body, { headers });
-});
-
-const zl = (grosze: number) => (grosze / 100).toLocaleString("pl-PL", { style: "currency", currency: "PLN" });
-
-app.get("/", async (c) => {
-  const tenant = c.get("tenant");
-  const { catalog } = forTenant(platform, c.env.DB, tenant.id);
-  const items = await catalog.listItems({ status: "active" });
-  return c.html(html`<!doctype html>
-    <html lang="pl">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <title>${tenant.name}</title>
-      </head>
-      <body>
-        <h1>${tenant.name}</h1>
-        <ul>
-          ${items.map((i) => html`<li>${i.name} <strong>${zl(i.price)}</strong></li>`)}
-        </ul>
-      </body>
-    </html>`);
-});
-
-export default app;
+export default createApp();

@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-06 | Claude | Logowanie linkiem z maila, sesje i pierwszy panel pod `panel.<domena>`; 13 testów ataków w `test/auth.test.ts` | PR `feat/core-catalog` | Zasady bezpieczeństwa w docs/SECURITY.md, czytaj przed zmianą logowania lub panelu. Lokalnie link do logowania pojawia się w konsoli `pnpm dev` (ConsoleMailer). Każda trasa panelu z `:site` musi iść przez `siteFor()`. Panel to na razie surowy HTML |
 | 2026-11-06 | Claude | Rozpoznawanie sklepu po adresie (`<slug>.PLATFORM_DOMAIN` i tabela `tenant_domains`), zdjęcia w R2 (`core/media.ts`, klucze z prefiksem `tenant_id`), prosta strona główna sklepu z listą aktywnych pozycji | PR `feat/core-catalog` | Lokalnie sklep działa pod `http://<slug>.localhost:8787`. Sklep rozpoznajemy z URL żądania, nie z nagłówka Host. Strona główna to na razie surowy HTML bez szablonu; szablony w etapie 2. Rozpoznawanie sklepu warto później cache'ować w KV |
 | 2026-11-06 | Claude | Rdzeń: katalog (pozycje i kategorie), `TenantDb` z wymuszonym `tenant_id`, szyna zdarzeń, rejestr modułów z włączaniem per sklep | PR `feat/core-catalog` | Ceny w groszach (liczby całkowite). SQL w rdzeniu: `?1` to zawsze `tenant_id`, pozostałe parametry od `?2`. Zdarzenia na razie `item.*` i `category.created`; zamówienia dojdą w etapie 4. Moduły w testach przez `test/core-under-test.ts`. Następne: zdjęcia w R2, panel, rozpoznawanie sklepu po adresie |
 | 2026-11-06 | Claude | Szkielet projektu: Hono na Workers, D1 z pierwszą migracją (`tenants`), Vitest, ESLint, CI, szablon PR | PR `feat/infra-scaffold` | `worker-configuration.d.ts` nie jest w repo, generuje go `pnpm types` (uruchamiane automatycznie przez typecheck i test). `database_id` w wrangler.jsonc to atrapa do czasu pierwszego wdrożenia. Następne: etap 1, model danych katalogu |
@@ -47,7 +48,9 @@ Cel: jeden silnik, na którym stoją wszystkie rodzaje stron.
 - [ ] Sloty: fragmenty modułów wstawiane do stron sklepu
 - [x] Zapis zdjęć w R2 i serwowanie z cache (tylko właścicielowi)
 - [ ] Zdjęcia w kilku rozmiarach (miniatury) i upload z panelu
-- [ ] Panel sprzedawcy: logowanie, dodawanie i edycja pozycji, ustawienia sklepu
+- [x] Logowanie linkiem z maila, sesje, ochrona panelu (opis: docs/SECURITY.md)
+- [x] Panel: zakładanie strony, lista, dodawanie i usuwanie pozycji
+- [ ] Panel: edycja pozycji, kategorie, zdjęcia, ustawienia sklepu
 - [x] Rozpoznawanie sklepu po adresie (subdomena i własna domena)
 
 ## Etap 2: Wizytówka

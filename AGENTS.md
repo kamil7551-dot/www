@@ -107,6 +107,7 @@ PR, który przekracza budżet, nie zostanie zmergowany bez zgody Kamila.
 - Commity w stylu Conventional Commits: `feat(module-inpost): add locker picker`.
 - Każdy PR zawiera testy dla nowej logiki i przechodzi: `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 - Zmiany w `core/`, `migrations/` i `AGENTS.md` wymagają przeglądu Claude jako architekta. W opisie PR zaznacz, że dotyka rdzenia.
+- Zmiany w logowaniu, sesjach i panelu: najpierw przeczytaj [docs/SECURITY.md](docs/SECURITY.md); każda trasa panelu z identyfikatorem strony sprawdza członkostwo (`siteFor()` w `panel.ts`).
 - Żadnych sekretów w repozytorium. Klucze API tylko przez `wrangler secret`.
 - Nie zmieniaj nazw ani znaczenia istniejących zdarzeń, kolumn i id modułów; dodawaj nowe obok.
 

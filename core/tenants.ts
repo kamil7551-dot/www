@@ -7,6 +7,9 @@ export interface Tenant {
   kind: SiteKind;
 }
 
+/** Subdomains the platform keeps for itself. A site can never take these slugs. */
+export const RESERVED_SLUGS = new Set(["panel", "www", "api", "admin", "app", "mail", "static", "cdn", "status", "help"]);
+
 const COLUMNS = "t.id, t.slug, t.name, t.kind";
 
 /**
@@ -24,6 +27,6 @@ export async function resolveTenant(db: D1Database, host: string, platformDomain
   const suffix = `.${platformDomain.toLowerCase()}`;
   if (!hostname.endsWith(suffix)) return null;
   const slug = hostname.slice(0, -suffix.length);
-  if (!slug || slug.includes(".")) return null;
+  if (!slug || slug.includes(".") || RESERVED_SLUGS.has(slug)) return null;
   return db.prepare(`SELECT ${COLUMNS} FROM tenants t WHERE t.slug = ?1`).bind(slug).first<Tenant>();
 }
