@@ -88,6 +88,10 @@ Zdarzenia rdzenia (pełna lista z typami w `core/events.ts`; zmiany tylko przez 
 - dostępne: `item.created`, `item.updated`, `item.deleted`, `category.created`,
 - planowane: `order.created`, `order.paid`, `order.shipped`, `order.cancelled`, `customer.created`, `page.render`.
 
+Sloty (miejsca na stronie, gdzie moduł dokleja treść) są opisane w `core/slots.ts`. Treść slotu buduj przez `html```` z `hono/html`; zwykły tekst zostanie zamieniony na bezpieczny tekst, nie na HTML.
+
+Szablony stron to katalogi `themes/<id>/` eksportujące `defineTheme({ id, name, kinds, home })`. Szablon dostaje gotowe dane (`HomeView`) i nie sięga do bazy ani do sieci.
+
 Zapytania SQL w rdzeniu idą przez `TenantDb` (`core/db.ts`): `?1` to zawsze `tenant_id`, kolejne parametry od `?2`. Zapytanie bez `tenant_id` zostanie odrzucone przed wykonaniem.
 
 ## Budżet wydajności strony klienta

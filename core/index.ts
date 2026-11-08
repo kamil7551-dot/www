@@ -2,22 +2,28 @@ import { Catalog } from "./catalog";
 import { TenantDb } from "./db";
 import type { CoreEvents, EventBus, EventName } from "./events";
 import type { ModuleRegistry } from "./modules";
+import { Settings } from "./settings";
+import { renderSlot, type SlotContext, type SlotData, type SlotName } from "./slots";
+import type { ThemeRegistry } from "./themes";
 
 export interface Platform {
   bus: EventBus;
   modules: ModuleRegistry;
+  themes: ThemeRegistry;
 }
 
 /** Everything the core offers for one tenant during one request. */
 export function forTenant(platform: Platform, d1: D1Database, tenantId: string) {
   const db = new TenantDb(d1, tenantId);
   let enabled: Promise<Set<string>> | undefined;
+  const enabledModules = () => (enabled ??= platform.modules.enabledFor(db));
   const emit = async <E extends EventName>(event: E, payload: CoreEvents[E]) => {
-    enabled ??= platform.modules.enabledFor(db);
-    const active = await enabled;
+    const active = await enabledModules();
     await platform.bus.emit(event, payload, { tenantId }, (source) => source === "core" || active.has(source));
   };
-  return { db, catalog: new Catalog(db, emit) };
+  const slot = async <S extends SlotName>(name: S, data: SlotData[S], ctx: SlotContext) =>
+    renderSlot(platform.modules.slotRenderers(name, await enabledModules()), data, ctx);
+  return { db, catalog: new Catalog(db, emit), settings: new Settings(db), enabledModules, slot };
 }
 
 export { Catalog, ValidationError } from "./catalog";
@@ -28,6 +34,11 @@ export type { CoreEvents, EventName } from "./events";
 export { ModuleRegistry, defineModule } from "./modules";
 export type { ModuleDefinition } from "./modules";
 export { slugify } from "./slug";
+export { DEFAULT_SETTINGS, Settings, cleanSettings } from "./settings";
+export type { SiteSettings } from "./settings";
+export type { SlotData, SlotName, SlotRenderer } from "./slots";
+export { ThemeRegistry, defineTheme } from "./themes";
+export type { HomeView, ThemeDefinition } from "./themes";
 export { Media, MediaError, IMAGE_TYPES, MAX_IMAGE_BYTES } from "./media";
 export { RESERVED_SLUGS, resolveTenant } from "./tenants";
 export * as auth from "./auth";

@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-08 | Claude | Ustawienia strony (`core/settings.ts`), sloty modułów (`core/slots.ts`), szablony (`core/themes.ts`) i szablon `themes/simple` | PR `feat/core-catalog` | Ustawienia są walidowane przy zapisie i ponownie przy odczycie. Moduł zwracający zwykły tekst do slotu jest escapowany; HTML tylko przez `html```. Wyjątek w slocie jest logowany i pomijany. Szablon dostaje gotowe dane i `slot()`, sam nie sięga do bazy |
 | 2026-11-06 | Claude | Logowanie linkiem z maila, sesje i pierwszy panel pod `panel.<domena>`; 13 testów ataków w `test/auth.test.ts` | PR `feat/core-catalog` | Zasady bezpieczeństwa w docs/SECURITY.md, czytaj przed zmianą logowania lub panelu. Lokalnie link do logowania pojawia się w konsoli `pnpm dev` (ConsoleMailer). Każda trasa panelu z `:site` musi iść przez `siteFor()`. Panel to na razie surowy HTML |
 | 2026-11-06 | Claude | Rozpoznawanie sklepu po adresie (`<slug>.PLATFORM_DOMAIN` i tabela `tenant_domains`), zdjęcia w R2 (`core/media.ts`, klucze z prefiksem `tenant_id`), prosta strona główna sklepu z listą aktywnych pozycji | PR `feat/core-catalog` | Lokalnie sklep działa pod `http://<slug>.localhost:8787`. Sklep rozpoznajemy z URL żądania, nie z nagłówka Host. Strona główna to na razie surowy HTML bez szablonu; szablony w etapie 2. Rozpoznawanie sklepu warto później cache'ować w KV |
 | 2026-11-06 | Claude | Rdzeń: katalog (pozycje i kategorie), `TenantDb` z wymuszonym `tenant_id`, szyna zdarzeń, rejestr modułów z włączaniem per sklep | PR `feat/core-catalog` | Ceny w groszach (liczby całkowite). SQL w rdzeniu: `?1` to zawsze `tenant_id`, pozostałe parametry od `?2`. Zdarzenia na razie `item.*` i `category.created`; zamówienia dojdą w etapie 4. Moduły w testach przez `test/core-under-test.ts`. Następne: zdjęcia w R2, panel, rozpoznawanie sklepu po adresie |
@@ -45,7 +46,9 @@ Cel: jeden silnik, na którym stoją wszystkie rodzaje stron.
 - [x] Model danych: tenanci (sklepy), pozycje katalogu (produkt, usługa, danie), kategorie
 - [x] Warstwa danych z automatycznym `tenant_id`
 - [x] Szyna zdarzeń i rejestr modułów (`defineModule`, hooki, zależności, ustawienia, włączanie per sklep)
-- [ ] Sloty: fragmenty modułów wstawiane do stron sklepu
+- [x] Sloty: fragmenty modułów wstawiane do stron sklepu (`head`, `home.top`, `home.bottom`, `item.after`, `footer`)
+- [x] Ustawienia strony (opis, kontakt, godziny, kolor, logo, szablon) z walidacją
+- [x] System szablonów (`defineTheme`) i szablon domyślny `simple` dla wszystkich rodzajów stron
 - [x] Zapis zdjęć w R2 i serwowanie z cache (tylko właścicielowi)
 - [ ] Zdjęcia w kilku rozmiarach (miniatury) i upload z panelu
 - [x] Logowanie linkiem z maila, sesje, ochrona panelu (opis: docs/SECURITY.md)

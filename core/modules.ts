@@ -1,5 +1,6 @@
 import type { TenantDb } from "./db";
 import type { EventBus, EventHandler, EventName } from "./events";
+import type { SlotName, SlotRenderer } from "./slots";
 
 export interface SettingField {
   type: "text" | "number" | "boolean" | "secret";
@@ -15,6 +16,8 @@ export interface ModuleDefinition {
   requires?: string[];
   settings?: Record<string, SettingField>;
   hooks?: { [E in EventName]?: EventHandler<E> };
+  /** Content the module adds to storefront pages. */
+  slots?: { [S in SlotName]?: SlotRenderer<S> };
 }
 
 const ID_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -55,6 +58,16 @@ export class ModuleRegistry {
         bus.on(event as EventName, handler as EventHandler<EventName>, def.id);
       }
     }
+  }
+
+  /** Renderers for one slot from the given modules, in registration order. */
+  slotRenderers<S extends SlotName>(name: S, enabled: Set<string>): { source: string; render: SlotRenderer<S> }[] {
+    const out: { source: string; render: SlotRenderer<S> }[] = [];
+    for (const def of this.modules.values()) {
+      const render = def.slots?.[name] as SlotRenderer<S> | undefined;
+      if (render && enabled.has(def.id)) out.push({ source: def.id, render });
+    }
+    return out;
   }
 
   async enabledFor(db: TenantDb): Promise<Set<string>> {

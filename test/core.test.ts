@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
-import { EventBus, ModuleRegistry, TenantDb, ValidationError, defineModule, forTenantForTest, slugify } from "./core-under-test";
+import { EventBus, ModuleRegistry, TenantDb, ValidationError, defineModule, forTenantForTest, slugify, testPlatform } from "./core-under-test";
 import { createTenant } from "./helpers";
 
 describe("slugify", () => {
@@ -70,8 +70,8 @@ describe("modules", () => {
     const off = await createTenant();
     await modules.enable(new TenantDb(env.DB, on), "test-notify");
 
-    await forTenantForTest(on, { bus, modules }).catalog.createItem({ kind: "service", name: "Serwis", price: 100 });
-    await forTenantForTest(off, { bus, modules }).catalog.createItem({ kind: "service", name: "Serwis", price: 100 });
+    await forTenantForTest(on, { bus, modules, themes: testPlatform().themes }).catalog.createItem({ kind: "service", name: "Serwis", price: 100 });
+    await forTenantForTest(off, { bus, modules, themes: testPlatform().themes }).catalog.createItem({ kind: "service", name: "Serwis", price: 100 });
 
     expect(seen).toEqual([`${on}:Serwis`]);
   });
@@ -86,7 +86,7 @@ describe("modules", () => {
     const tenantId = await createTenant();
     await modules.enable(new TenantDb(env.DB, tenantId), "broken");
 
-    const item = await forTenantForTest(tenantId, { bus, modules }).catalog.createItem({ kind: "product", name: "A", price: 1 });
+    const item = await forTenantForTest(tenantId, { bus, modules, themes: testPlatform().themes }).catalog.createItem({ kind: "product", name: "A", price: 1 });
     expect(item.name).toBe("A");
     expect(log).toHaveBeenCalledOnce();
   });

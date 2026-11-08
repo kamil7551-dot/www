@@ -1,7 +1,5 @@
 import { Hono } from "hono";
-import { html } from "hono/html";
 import { Media, forTenant, resolveTenant, type Platform, type Tenant } from "../../../core";
-import { page, zl } from "./layout";
 
 type StoreEnv = { Bindings: Env; Variables: { tenant: Tenant } };
 
@@ -26,15 +24,22 @@ export function storefrontApp(platform: Platform) {
 
   app.get("/", async (c) => {
     const tenant = c.get("tenant");
-    const items = await forTenant(platform, c.env.DB, tenant.id).catalog.listItems({ status: "active" });
+    const site = forTenant(platform, c.env.DB, tenant.id);
+    const [settings, items, categories] = await Promise.all([
+      site.settings.get(),
+      site.catalog.listItems({ status: "active" }),
+      site.catalog.listCategories(),
+    ]);
+    const theme = platform.themes.pick(tenant.kind, settings.theme);
     return c.html(
-      page(
-        tenant.name,
-        html`<h1>${tenant.name}</h1>
-          <ul>
-            ${items.map((i) => html`<li>${i.name} <strong>${zl(i.price)}</strong></li>`)}
-          </ul>`,
-      ),
+      theme.home({
+        tenant,
+        settings,
+        items,
+        categories,
+        slot: (name, data) => site.slot(name, data, { tenant, settings }),
+        mediaUrl: (key) => `/media/${encodeURI(key)}`,
+      }),
     );
   });
 
