@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import { Media, forTenant, resolveTenant, type Platform, type Tenant } from "../../../core";
+import { Media, cachedTenantResolver, forTenant, type Platform, type Tenant } from "../../../core";
 
 type StoreEnv = { Bindings: Env; Variables: { tenant: Tenant } };
 
 export function storefrontApp(platform: Platform) {
   const app = new Hono<StoreEnv>();
+  const resolveTenant = cachedTenantResolver();
 
   app.use("*", async (c, next) => {
     const tenant = await resolveTenant(c.env.DB, new URL(c.req.url).host, c.env.PLATFORM_DOMAIN);
@@ -15,7 +16,9 @@ export function storefrontApp(platform: Platform) {
 
   app.get("/media/*", async (c) => {
     const key = decodeURIComponent(c.req.path.slice("/media/".length));
-    const object = await new Media(c.env.MEDIA, c.get("tenant").id).get(key);
+    const media = new Media(c.env.MEDIA, c.get("tenant").id, c.env.IMAGES);
+    const width = Number(c.req.query("w"));
+    const object = width > 0 ? await media.variant(key, width) : await media.get(key);
     if (!object) return c.notFound();
     const headers = new Headers({ "cache-control": "public, max-age=31536000, immutable", etag: object.httpEtag });
     object.writeHttpMetadata(headers);
@@ -38,7 +41,7 @@ export function storefrontApp(platform: Platform) {
         items,
         categories,
         slot: (name, data) => site.slot(name, data, { tenant, settings }),
-        mediaUrl: (key) => `/media/${encodeURI(key)}`,
+        mediaUrl: (key, width) => `/media/${encodeURI(key)}${width ? `?w=${width}` : ""}`,
       }),
     );
   });

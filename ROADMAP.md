@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-08 | Claude | Miniatury zdjęć przez binding Images (`Media.variant`), weryfikacja bajtów obrazu przy uploadzie, cache rozpoznawania sklepu (`cachedTenantResolver`), test budżetu wydajności strony głównej | PR `feat/core-catalog` | Binding `IMAGES` działa lokalnie (miniflare + sharp). Testy uploadu muszą używać prawdziwego obrazu: `test/fixtures.ts`. Zmiana domeny lub sluga sklepu jest widoczna po max 60 s. Test budżetu w `test/storefront.test.ts` pilnuje braku JS i < 100 KB gzip |
 | 2026-11-08 | Claude | Panel: edycja pozycji (opis, kategoria, status, zdjęcie), kategorie, ustawienia strony z logo; zdjęcia pozycji w szablonie `simple` | PR `feat/core-catalog` | Rdzeń sam pilnuje, żeby kategoria należała do tej samej strony (`Catalog.checkCategory`). Ustawienia widzi tylko rola `owner`. Pomocnik testów panelu: `test/panel-harness.ts`. Następne: miniatury zdjęć, cache rozpoznawania sklepu w KV, wygląd panelu |
 | 2026-11-08 | Claude | Ustawienia strony (`core/settings.ts`), sloty modułów (`core/slots.ts`), szablony (`core/themes.ts`) i szablon `themes/simple` | PR `feat/core-catalog` | Ustawienia są walidowane przy zapisie i ponownie przy odczycie. Moduł zwracający zwykły tekst do slotu jest escapowany; HTML tylko przez `html```. Wyjątek w slocie jest logowany i pomijany. Szablon dostaje gotowe dane i `slot()`, sam nie sięga do bazy |
 | 2026-11-06 | Claude | Logowanie linkiem z maila, sesje i pierwszy panel pod `panel.<domena>`; 13 testów ataków w `test/auth.test.ts` | PR `feat/core-catalog` | Zasady bezpieczeństwa w docs/SECURITY.md, czytaj przed zmianą logowania lub panelu. Lokalnie link do logowania pojawia się w konsoli `pnpm dev` (ConsoleMailer). Każda trasa panelu z `:site` musi iść przez `siteFor()`. Panel to na razie surowy HTML |
@@ -52,7 +53,8 @@ Cel: jeden silnik, na którym stoją wszystkie rodzaje stron.
 - [x] System szablonów (`defineTheme`) i szablon domyślny `simple` dla wszystkich rodzajów stron
 - [x] Zapis zdjęć w R2 i serwowanie z cache (tylko właścicielowi)
 - [x] Upload zdjęć z panelu (stare pliki są usuwane z R2)
-- [ ] Zdjęcia w kilku rozmiarach (miniatury)
+- [x] Zdjęcia w kilku rozmiarach (WebP 320/640/1280, robione raz i trzymane w R2) i sprawdzanie, czy plik to naprawdę obraz
+- [x] Cache rozpoznawania sklepu w pamięci (60 s, nieznane adresy 10 s)
 - [x] Logowanie linkiem z maila, sesje, ochrona panelu (opis: docs/SECURITY.md)
 - [x] Panel: zakładanie strony, lista, dodawanie i usuwanie pozycji
 - [x] Panel: edycja pozycji, kategorie, zdjęcia, ustawienia strony i logo (tylko właściciel)

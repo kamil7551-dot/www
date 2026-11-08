@@ -44,7 +44,7 @@ export default defineTheme({
         </head>
         <body>
           <header>
-            ${s.logoKey ? html`<img class="logo" src="${v.mediaUrl(s.logoKey)}" alt="${v.tenant.name}" />` : ""}
+            ${s.logoKey ? html`<img class="logo" src="${v.mediaUrl(s.logoKey, 320)}" alt="${v.tenant.name}" />` : ""}
             <h1>${v.tenant.name}</h1>
             ${s.tagline ? html`<p class="tag">${s.tagline}</p>` : ""}
           </header>
@@ -55,7 +55,11 @@ export default defineTheme({
                 <ul>
                   ${g.items.map(
                     async (i) => html`<li>
-                      ${i.image_key ? html`<img class="pic" src="${v.mediaUrl(i.image_key)}" alt="${i.name}" loading="lazy" decoding="async" />` : ""}
+                      ${i.image_key
+                        ? html`<img class="pic" src="${v.mediaUrl(i.image_key, 640)}"
+                            srcset="${v.mediaUrl(i.image_key, 320)} 320w, ${v.mediaUrl(i.image_key, 640)} 640w, ${v.mediaUrl(i.image_key, 1280)} 1280w"
+                            sizes="(max-width: 24rem) 100vw, 22rem" alt="${i.name}" loading="lazy" decoding="async" />`
+                        : ""}
                       <div class="row"><span>${i.name}</span><span class="price">${zl(i.price)}</span></div>
                       ${i.description ? html`<p class="desc">${i.description}</p>` : ""}
                       ${await v.slot("item.after", { item: i })}

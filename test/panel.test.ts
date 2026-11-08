@@ -2,9 +2,10 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { ValidationError, forTenantForTest } from "./core-under-test";
 import { createTenant } from "./helpers";
+import { pngBytes } from "./fixtures";
 import { harness, uniqueEmail } from "./panel-harness";
 
-const png = () => new File([new Uint8Array([137, 80, 78, 71, 1, 2, 3])], "a.png", { type: "image/png" });
+const png = () => new File([pngBytes()], "a.png", { type: "image/png" });
 const siteId = (url: string) => url.split("/").at(-1)!;
 
 async function seller() {
@@ -141,5 +142,17 @@ describe("panel: site settings", () => {
     const f = new FormData();
     f.set("tagline", "Przejęte");
     expect((await staff.call(`${site}/settings`, { multipart: f })).status).toBe(404);
+  });
+});
+
+describe("images", () => {
+  it("rejects a file that only pretends to be a PNG", async () => {
+    const h = await seller();
+    const site = await h.newSite("Udawacz");
+    const itemUrl = (await h.call(`${site}/items`, { form: { name: "X", price: "1", kind: "product" } })).headers.get("location")!;
+    const f = new FormData();
+    for (const [k, v] of Object.entries({ name: "X", price: "1", status: "active" })) f.set(k, v);
+    f.set("image", new File(["<html><script>alert(1)</script>"], "x.png", { type: "image/png" }));
+    expect((await h.call(itemUrl, { multipart: f })).status).toBe(400);
   });
 });

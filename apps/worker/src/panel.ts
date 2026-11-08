@@ -179,7 +179,7 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     const tenantId = c.req.param("site") ?? "";
     const role = await auth.membership(c.env.DB, c.get("user").userId, tenantId);
     if (!role) return null;
-    return { tenantId, role, media: new Media(c.env.MEDIA, tenantId), ...forTenant(platform, c.env.DB, tenantId) };
+    return { tenantId, role, media: new Media(c.env.MEDIA, tenantId, c.env.IMAGES), ...forTenant(platform, c.env.DB, tenantId) };
   }
 
   const notFound = (c: Context<PanelEnv>) => c.text("Nie znaleziono", 404);

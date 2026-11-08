@@ -3,7 +3,8 @@ import { env } from "cloudflare:workers";
 import { html } from "hono/html";
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../apps/worker/src/index";
-import { TenantDb, ValidationError, type ModuleDefinition, defineModule, defineTheme, forTenantForTest, testPlatform } from "./core-under-test";
+import { Media, TenantDb, ValidationError, type ModuleDefinition, defineModule, defineTheme, forTenantForTest, testPlatform } from "./core-under-test";
+import { pngBytes } from "./fixtures";
 import { createTenant } from "./helpers";
 
 async function site(slug: string, kind: "shop" | "qr-menu" | "business-card" = "shop") {
@@ -113,5 +114,49 @@ describe("module slots", () => {
 
     const without = await render("bez-modulu", [badge, broken]);
     expect(without.body).not.toContain("badge");
+  });
+});
+
+describe("image variants", () => {
+  it("serves a smaller WebP copy, caches it in R2 and removes it with the original", async () => {
+    const s = await site("miniatury");
+    const media = new Media(env.MEDIA, s.id, env.IMAGES);
+    const key = await media.putImage(pngBytes().buffer as ArrayBuffer, "image/png");
+    await s.catalog.createItem({ kind: "product", name: "Kubek", price: 1000, imageKey: key });
+
+    const page = await render("miniatury");
+    expect(page.body).toContain(`/media/${key}?w=640`);
+    expect(page.body).toContain("320w");
+
+    const app = createApp({ mailer: () => noMail });
+    const res = await app.fetch(new Request(`https://miniatury.localhost/media/${key}?w=500`), env, createExecutionContext());
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/webp");
+    const info = await env.IMAGES.info(res.body!);
+    expect("width" in info && info.width).toBe(640);
+    expect(await env.MEDIA.head(`${key}.w640.webp`)).not.toBeNull();
+
+    await media.delete(key);
+    expect(await env.MEDIA.head(key)).toBeNull();
+    expect(await env.MEDIA.head(`${key}.w640.webp`)).toBeNull();
+  });
+
+  it("never resizes another site's file or a resized copy", async () => {
+    const a = await site("a-foto");
+    const key = await new Media(env.MEDIA, a.id, env.IMAGES).putImage(pngBytes().buffer as ArrayBuffer, "image/png");
+    const other = new Media(env.MEDIA, (await site("b-foto")).id, env.IMAGES);
+    expect(await other.variant(key, 320)).toBeNull();
+    expect(await new Media(env.MEDIA, a.id, env.IMAGES).variant(`${key}.w320.webp`, 320)).toBeNull();
+  });
+});
+
+describe("performance budget (AGENTS.md)", () => {
+  it("keeps the default home page script-free and well under 100 KB", async () => {
+    const s = await site("budzet");
+    for (let i = 0; i < 50; i++) await s.catalog.createItem({ kind: "product", name: `Produkt ${i}`, price: 1000 + i });
+    const { body } = await render("budzet");
+    expect(body).not.toMatch(/<script/i);
+    const gzipped = await new Response(new Blob([body]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+    expect(gzipped.byteLength).toBeLessThan(100 * 1024);
   });
 });

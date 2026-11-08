@@ -9,6 +9,7 @@
     // Sites live at <slug>.<PLATFORM_DOMAIN>. Locally: http://demo.localhost:8787
     "PLATFORM_DOMAIN": "localhost"
   },
+  "images": { "binding": "IMAGES" },
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "www-media" }],
   "d1_databases": [
     {

@@ -13,8 +13,8 @@ export interface HomeView {
   categories: Category[];
   /** Renders what enabled modules put in a slot. Always safe to call; returns "" when nothing is there. */
   slot: <S extends SlotName>(name: S, data: SlotData[S]) => Promise<HtmlEscapedString>;
-  /** Public URL of a media key (logo, item image). */
-  mediaUrl: (key: string) => string;
+  /** Public URL of a media key (logo, item image); with a width, a resized WebP copy. */
+  mediaUrl: (key: string, width?: number) => string;
 }
 
 export interface ThemeDefinition {
