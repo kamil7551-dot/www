@@ -73,8 +73,16 @@ export class Catalog {
     private emit: Emit,
   ) {}
 
+  /** A category id from another site must never be attached to this site's items. */
+  private async checkCategory(categoryId: string | null | undefined): Promise<void> {
+    if (!categoryId) return;
+    const found = await this.db.first(`SELECT 1 FROM categories WHERE tenant_id = ?1 AND id = ?2`, categoryId);
+    if (!found) throw new ValidationError("Unknown category");
+  }
+
   async createItem(input: NewItem): Promise<Item> {
     check(input);
+    await this.checkCategory(input.categoryId);
     const id = newId();
     const slug = slugify(input.slug ?? input.name) || id;
     await this.db.run(
@@ -119,6 +127,7 @@ export class Catalog {
     check(patch);
     const current = await this.getItem(id);
     if (!current) return null;
+    await this.checkCategory(patch.categoryId);
     await this.db.run(
       `UPDATE items SET name = ?3, slug = ?4, description = ?5, price = ?6, currency = ?7, category_id = ?8,
          status = ?9, image_key = ?10, position = ?11, updated_at = unixepoch()
@@ -147,6 +156,10 @@ export class Catalog {
 
   async createCategory(input: { name: string; slug?: string; parentId?: string | null; position?: number }): Promise<Category> {
     if (!input.name.trim()) throw new ValidationError("Name is required");
+    if (input.parentId) {
+      const parent = await this.db.first(`SELECT 1 FROM categories WHERE tenant_id = ?1 AND id = ?2`, input.parentId);
+      if (!parent) throw new ValidationError("Unknown parent category");
+    }
     const id = newId();
     await this.db.run(
       `INSERT INTO categories (tenant_id, id, parent_id, name, slug, position) VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,

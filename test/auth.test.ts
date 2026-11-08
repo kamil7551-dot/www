@@ -1,44 +1,8 @@
-import { createExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { createApp } from "../apps/worker/src/index";
 import { parsePrice } from "../apps/worker/src/layout";
-import { auth, type Mail } from "./core-under-test";
-
-const PANEL = "https://panel.localhost";
-
-function harness() {
-  const outbox: Mail[] = [];
-  const app = createApp({ mailer: () => ({ send: async (m) => void outbox.push(m) }) });
-  let cookie = "";
-  const call = async (path: string, init: RequestInit & { form?: Record<string, string>; origin?: string | null } = {}) => {
-    const headers = new Headers(init.headers);
-    if (cookie) headers.set("cookie", cookie);
-    if (init.form) {
-      headers.set("content-type", "application/x-www-form-urlencoded");
-      if (init.origin !== null) headers.set("origin", init.origin ?? PANEL);
-    }
-    const req = new Request(`${PANEL}${path}`, {
-      method: init.form ? "POST" : (init.method ?? "GET"),
-      headers,
-      body: init.form ? new URLSearchParams(init.form).toString() : undefined,
-      redirect: "manual",
-    });
-    const res = await app.fetch(req, env, createExecutionContext());
-    const set = res.headers.get("set-cookie");
-    if (set?.startsWith("__Host-sid=")) cookie = set.split(";")[0]!;
-    return res;
-  };
-  const tokenFrom = (mail: Mail) => new URL(mail.text.match(/https:\S+/)![0]).searchParams.get("t")!;
-  const login = async (email: string) => {
-    await call("/login", { form: { email } });
-    const res = await call("/login/verify", { form: { t: tokenFrom(outbox.at(-1)!) } });
-    expect(res.status).toBe(303);
-  };
-  return { outbox, call, tokenFrom, login, setCookie: (c: string) => (cookie = c), getCookie: () => cookie };
-}
-
-const uniqueEmail = () => `user-${crypto.randomUUID().slice(0, 8)}@example.com`;
+import { auth } from "./core-under-test";
+import { harness, uniqueEmail } from "./panel-harness";
 
 describe("login with e-mail link", () => {
   it("logs in through link and confirm button, with a hardened cookie", async () => {

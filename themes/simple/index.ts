@@ -36,6 +36,7 @@ export default defineTheme({
             ul{list-style:none;margin:0;padding:0}li{padding:.7rem 0;border-bottom:1px solid #eee}
             .row{display:flex;justify-content:space-between;gap:1rem}.price{font-weight:600;white-space:nowrap}
             .desc{color:#555;font-size:.95rem;margin:.2rem 0 0}
+            .pic{display:block;width:100%;max-width:22rem;aspect-ratio:4/3;object-fit:cover;border-radius:6px;margin:.4rem 0}
             footer{color:#444;font-size:.95rem;border-top:1px solid #eee}footer p{margin:.3rem 0}
             a{color:var(--accent)}
           </style>
@@ -54,6 +55,7 @@ export default defineTheme({
                 <ul>
                   ${g.items.map(
                     async (i) => html`<li>
+                      ${i.image_key ? html`<img class="pic" src="${v.mediaUrl(i.image_key)}" alt="${i.name}" loading="lazy" decoding="async" />` : ""}
                       <div class="row"><span>${i.name}</span><span class="price">${zl(i.price)}</span></div>
                       ${i.description ? html`<p class="desc">${i.description}</p>` : ""}
                       ${await v.slot("item.after", { item: i })}

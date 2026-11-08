@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-08 | Claude | Panel: edycja pozycji (opis, kategoria, status, zdjęcie), kategorie, ustawienia strony z logo; zdjęcia pozycji w szablonie `simple` | PR `feat/core-catalog` | Rdzeń sam pilnuje, żeby kategoria należała do tej samej strony (`Catalog.checkCategory`). Ustawienia widzi tylko rola `owner`. Pomocnik testów panelu: `test/panel-harness.ts`. Następne: miniatury zdjęć, cache rozpoznawania sklepu w KV, wygląd panelu |
 | 2026-11-08 | Claude | Ustawienia strony (`core/settings.ts`), sloty modułów (`core/slots.ts`), szablony (`core/themes.ts`) i szablon `themes/simple` | PR `feat/core-catalog` | Ustawienia są walidowane przy zapisie i ponownie przy odczycie. Moduł zwracający zwykły tekst do slotu jest escapowany; HTML tylko przez `html```. Wyjątek w slocie jest logowany i pomijany. Szablon dostaje gotowe dane i `slot()`, sam nie sięga do bazy |
 | 2026-11-06 | Claude | Logowanie linkiem z maila, sesje i pierwszy panel pod `panel.<domena>`; 13 testów ataków w `test/auth.test.ts` | PR `feat/core-catalog` | Zasady bezpieczeństwa w docs/SECURITY.md, czytaj przed zmianą logowania lub panelu. Lokalnie link do logowania pojawia się w konsoli `pnpm dev` (ConsoleMailer). Każda trasa panelu z `:site` musi iść przez `siteFor()`. Panel to na razie surowy HTML |
 | 2026-11-06 | Claude | Rozpoznawanie sklepu po adresie (`<slug>.PLATFORM_DOMAIN` i tabela `tenant_domains`), zdjęcia w R2 (`core/media.ts`, klucze z prefiksem `tenant_id`), prosta strona główna sklepu z listą aktywnych pozycji | PR `feat/core-catalog` | Lokalnie sklep działa pod `http://<slug>.localhost:8787`. Sklep rozpoznajemy z URL żądania, nie z nagłówka Host. Strona główna to na razie surowy HTML bez szablonu; szablony w etapie 2. Rozpoznawanie sklepu warto później cache'ować w KV |
@@ -50,10 +51,11 @@ Cel: jeden silnik, na którym stoją wszystkie rodzaje stron.
 - [x] Ustawienia strony (opis, kontakt, godziny, kolor, logo, szablon) z walidacją
 - [x] System szablonów (`defineTheme`) i szablon domyślny `simple` dla wszystkich rodzajów stron
 - [x] Zapis zdjęć w R2 i serwowanie z cache (tylko właścicielowi)
-- [ ] Zdjęcia w kilku rozmiarach (miniatury) i upload z panelu
+- [x] Upload zdjęć z panelu (stare pliki są usuwane z R2)
+- [ ] Zdjęcia w kilku rozmiarach (miniatury)
 - [x] Logowanie linkiem z maila, sesje, ochrona panelu (opis: docs/SECURITY.md)
 - [x] Panel: zakładanie strony, lista, dodawanie i usuwanie pozycji
-- [ ] Panel: edycja pozycji, kategorie, zdjęcia, ustawienia sklepu
+- [x] Panel: edycja pozycji, kategorie, zdjęcia, ustawienia strony i logo (tylko właściciel)
 - [x] Rozpoznawanie sklepu po adresie (subdomena i własna domena)
 
 ## Etap 2: Wizytówka

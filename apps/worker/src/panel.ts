@@ -1,7 +1,21 @@
 import { Hono, type Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { html } from "hono/html";
-import { RESERVED_SLUGS, auth, forTenant, newId, slugify, ValidationError, type Mailer, type Platform } from "../../../core";
+import {
+  Media,
+  MediaError,
+  RESERVED_SLUGS,
+  ValidationError,
+  auth,
+  forTenant,
+  newId,
+  slugify,
+  type ItemKind,
+  type ItemStatus,
+  type Mailer,
+  type Platform,
+  type SiteSettings,
+} from "../../../core";
 import { page, parsePrice, zl } from "./layout";
 
 export const SESSION_COOKIE = "__Host-sid";
@@ -164,27 +178,42 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
   async function siteFor(c: Context<PanelEnv>) {
     const tenantId = c.req.param("site") ?? "";
     const role = await auth.membership(c.env.DB, c.get("user").userId, tenantId);
-    return role ? { tenantId, ...forTenant(platform, c.env.DB, tenantId) } : null;
+    if (!role) return null;
+    return { tenantId, role, media: new Media(c.env.MEDIA, tenantId), ...forTenant(platform, c.env.DB, tenantId) };
   }
+
+  const notFound = (c: Context<PanelEnv>) => c.text("Nie znaleziono", 404);
+  const bad = (c: Context<PanelEnv>, message: string) =>
+    c.html(page("Błąd", html`<h1>Coś się nie zgadza</h1><p>${message}</p><p><a href="/">Wróć do panelu</a></p>`), 400);
+
+  /** Stores an uploaded image if the form has one. Returns the new key, undefined when no file was sent. */
+  async function upload(media: Media, file: unknown): Promise<string | undefined> {
+    if (!(file instanceof File) || file.size === 0) return undefined;
+    return media.putImage(await file.arrayBuffer(), file.type);
+  }
+
+  const STATUS_LABEL: Record<ItemStatus, string> = { active: "widoczna", hidden: "ukryta", draft: "szkic" };
 
   app.get("/sites/:site", async (c) => {
     const site = await siteFor(c);
-    if (!site) return c.text("Nie znaleziono", 404);
-    const items = await site.catalog.listItems();
+    if (!site) return notFound(c);
+    const [items, categories] = await Promise.all([site.catalog.listItems(), site.catalog.listCategories()]);
+    const catName = new Map(categories.map((x) => [x.id, x.name]));
     return c.html(
       page(
         "Pozycje",
-        html`<p><a href="/">← Twoje strony</a></p>
+        html`<p><a href="/">← Twoje strony</a>${site.role === "owner" ? html` · <a href="/sites/${site.tenantId}/settings">Ustawienia strony</a>` : ""}</p>
           <h1>Pozycje</h1>
           <ul>
             ${items.map(
               (i) => html`<li class="row">
-                ${i.name} <strong>${zl(i.price)}</strong> <span class="muted">${i.status}</span>
+                <a href="/sites/${site.tenantId}/items/${i.id}">${i.name}</a> <strong>${zl(i.price)}</strong>
+                <span class="muted">${STATUS_LABEL[i.status]}${i.category_id ? html` · ${catName.get(i.category_id) ?? ""}` : ""}</span>
                 <form method="post" action="/sites/${site.tenantId}/items/${i.id}/delete"><button>Usuń</button></form>
               </li>`,
             )}
           </ul>
-          <h2>Dodaj</h2>
+          <h2>Dodaj pozycję</h2>
           <form method="post" action="/sites/${site.tenantId}/items" class="row">
             <input name="name" placeholder="Nazwa" required maxlength="120" />
             <input name="price" placeholder="Cena, np. 29,99" required inputmode="decimal" />
@@ -194,6 +223,14 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
               <option value="dish">Danie</option>
             </select>
             <button>Dodaj</button>
+          </form>
+          <h2>Kategorie</h2>
+          <ul>
+            ${categories.map((x) => html`<li>${x.name}</li>`)}
+          </ul>
+          <form method="post" action="/sites/${site.tenantId}/categories" class="row">
+            <input name="name" placeholder="Nowa kategoria" required maxlength="80" />
+            <button>Dodaj kategorię</button>
           </form>`,
       ),
     );
@@ -201,18 +238,89 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
 
   app.post("/sites/:site/items", async (c) => {
     const site = await siteFor(c);
-    if (!site) return c.text("Nie znaleziono", 404);
+    if (!site) return notFound(c);
     const form = await c.req.parseBody();
     const price = parsePrice(String(form.price ?? ""));
-    if (price === null) return c.text("Niepoprawna cena", 400);
+    if (price === null) return bad(c, "Niepoprawna cena. Wpisz np. 29,99.");
     try {
-      await site.catalog.createItem({
-        kind: String(form.kind) as "product",
+      const item = await site.catalog.createItem({
+        kind: String(form.kind) as ItemKind,
         name: String(form.name ?? "").slice(0, 120),
         price,
       });
+      return c.redirect(`/sites/${site.tenantId}/items/${item.id}`, 303);
     } catch (error) {
-      if (error instanceof ValidationError) return c.text(error.message, 400);
+      if (error instanceof ValidationError) return bad(c, error.message);
+      throw error;
+    }
+  });
+
+  app.get("/sites/:site/items/:item", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const [item, categories] = await Promise.all([site.catalog.getItem(c.req.param("item")), site.catalog.listCategories()]);
+    if (!item) return notFound(c);
+    return c.html(
+      page(
+        item.name,
+        html`<p><a href="/sites/${site.tenantId}">← Pozycje</a></p>
+          <h1>${item.name}</h1>
+          <form method="post" action="/sites/${site.tenantId}/items/${item.id}" enctype="multipart/form-data">
+            <p><label>Nazwa<br /><input name="name" value="${item.name}" required maxlength="120" /></label></p>
+            <p><label>Cena<br /><input name="price" value="${(item.price / 100).toFixed(2).replace(".", ",")}" required inputmode="decimal" /></label></p>
+            <p><label>Opis<br /><textarea name="description" rows="4" cols="50" maxlength="2000">${item.description}</textarea></label></p>
+            <p>
+              <label>Kategoria<br />
+                <select name="categoryId">
+                  <option value="">brak</option>
+                  ${categories.map((x) => html`<option value="${x.id}" ${x.id === item.category_id ? "selected" : ""}>${x.name}</option>`)}
+                </select>
+              </label>
+            </p>
+            <p>
+              <label>Status<br />
+                <select name="status">
+                  ${(Object.keys(STATUS_LABEL) as ItemStatus[]).map(
+                    (s) => html`<option value="${s}" ${s === item.status ? "selected" : ""}>${STATUS_LABEL[s]}</option>`,
+                  )}
+                </select>
+              </label>
+            </p>
+            <p>
+              <label>Zdjęcie (JPG, PNG, WebP, AVIF, do 5 MB)<br /><input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/avif" /></label>
+              ${item.image_key ? html`<br /><span class="muted">Zdjęcie jest dodane. Nowy plik je zastąpi.</span>` : ""}
+            </p>
+            <button>Zapisz</button>
+          </form>`,
+      ),
+    );
+  });
+
+  app.post("/sites/:site/items/:item", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const current = await site.catalog.getItem(c.req.param("item"));
+    if (!current) return notFound(c);
+    const form = await c.req.parseBody();
+    const price = parsePrice(String(form.price ?? ""));
+    if (price === null) return bad(c, "Niepoprawna cena. Wpisz np. 29,99.");
+    const categoryId = String(form.categoryId ?? "");
+    if (categoryId && !(await site.catalog.listCategories()).some((x) => x.id === categoryId)) {
+      return bad(c, "Nieznana kategoria.");
+    }
+    try {
+      const imageKey = await upload(site.media, form.image);
+      await site.catalog.updateItem(current.id, {
+        name: String(form.name ?? "").slice(0, 120),
+        description: String(form.description ?? "").slice(0, 2000),
+        price,
+        categoryId: categoryId || null,
+        status: String(form.status) as ItemStatus,
+        ...(imageKey ? { imageKey } : {}),
+      });
+      if (imageKey && current.image_key) await site.media.delete(current.image_key);
+    } catch (error) {
+      if (error instanceof ValidationError || error instanceof MediaError) return bad(c, error.message);
       throw error;
     }
     return c.redirect(`/sites/${site.tenantId}`, 303);
@@ -220,9 +328,74 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
 
   app.post("/sites/:site/items/:item/delete", async (c) => {
     const site = await siteFor(c);
-    if (!site) return c.text("Nie znaleziono", 404);
-    await site.catalog.deleteItem(c.req.param("item"));
+    if (!site) return notFound(c);
+    const item = await site.catalog.getItem(c.req.param("item"));
+    if (item && (await site.catalog.deleteItem(item.id)) && item.image_key) await site.media.delete(item.image_key);
     return c.redirect(`/sites/${site.tenantId}`, 303);
+  });
+
+  app.post("/sites/:site/categories", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const form = await c.req.parseBody();
+    try {
+      await site.catalog.createCategory({ name: String(form.name ?? "").slice(0, 80) });
+    } catch (error) {
+      if (error instanceof ValidationError) return bad(c, error.message);
+      if (String(error).includes("UNIQUE")) return bad(c, "Taka kategoria już jest.");
+      throw error;
+    }
+    return c.redirect(`/sites/${site.tenantId}`, 303);
+  });
+
+  // Site settings: owners only.
+  app.get("/sites/:site/settings", async (c) => {
+    const site = await siteFor(c);
+    if (!site || site.role !== "owner") return notFound(c);
+    const s = await site.settings.get();
+    const field = (name: keyof SiteSettings, label: string, type = "text") =>
+      html`<p><label>${label}<br /><input type="${type}" name="${name}" value="${String(s[name] ?? "")}" /></label></p>`;
+    return c.html(
+      page(
+        "Ustawienia",
+        html`<p><a href="/sites/${site.tenantId}">← Pozycje</a></p>
+          <h1>Ustawienia strony</h1>
+          <form method="post" action="/sites/${site.tenantId}/settings" enctype="multipart/form-data">
+            ${field("tagline", "Krótki opis")} ${field("email", "E-mail kontaktowy", "email")} ${field("phone", "Telefon", "tel")}
+            ${field("address", "Adres")} ${field("hours", "Godziny otwarcia")} ${field("accent", "Kolor przewodni", "color")}
+            <p>
+              <label>Szablon<br />
+                <select name="theme">
+                  ${platform.themes.list().map((t) => html`<option value="${t.id}" ${t.id === s.theme ? "selected" : ""}>${t.name}</option>`)}
+                </select>
+              </label>
+            </p>
+            <p><label>Logo<br /><input type="file" name="logo" accept="image/png,image/webp,image/jpeg,image/avif" /></label></p>
+            <button>Zapisz</button>
+          </form>`,
+      ),
+    );
+  });
+
+  app.post("/sites/:site/settings", async (c) => {
+    const site = await siteFor(c);
+    if (!site || site.role !== "owner") return notFound(c);
+    const form = await c.req.parseBody();
+    const patch: Record<string, unknown> = {};
+    for (const key of ["tagline", "email", "phone", "address", "hours", "accent", "theme"] as const) {
+      if (typeof form[key] === "string") patch[key] = form[key];
+    }
+    try {
+      const before = await site.settings.get();
+      const logoKey = await upload(site.media, form.logo);
+      if (logoKey) patch.logoKey = logoKey;
+      await site.settings.update(patch);
+      if (logoKey && before.logoKey) await site.media.delete(before.logoKey);
+    } catch (error) {
+      if (error instanceof ValidationError || error instanceof MediaError) return bad(c, `Niepoprawne pole: ${error.message}`);
+      throw error;
+    }
+    return c.redirect(`/sites/${site.tenantId}/settings`, 303);
   });
 
   return app;
