@@ -23,7 +23,7 @@ Opis dla ludzi i agentów. Każda zmiana w `core/auth.ts`, `apps/worker/src/pane
 
 - Panel działa **tylko** pod `panel.<domena platformy>`. Ciasteczka sprzedawcy nigdy nie trafiają na domeny sklepów.
 - Każdy POST musi mieć nagłówek `Origin` równy adresowi panelu (ochrona przed CSRF). Brak nagłówka = odmowa.
-- Nagłówki: ścisłe CSP (zero skryptów, brak osadzania w ramkach), `Referrer-Policy: no-referrer` (token z linku nie wycieknie), `no-store`, HSTS, `nosniff`.
+- Nagłówki: ścisłe CSP (zero skryptów, brak osadzania w ramkach), `Referrer-Policy: same-origin` (token z linku nie wycieknie na zewnątrz, a formularze panelu dalej wysyłają prawdziwy nagłówek `Origin`; przy `no-referrer` przeglądarki wysyłają `Origin: null` i blokowałyby logowanie), `no-store`, HSTS, `nosniff`.
 - Dostęp do strony klienta zawsze przez `membership(user, tenant)`. Cudza strona zwraca 404, a nie 403, żeby nie zdradzać, że istnieje.
 - Subdomeny zarezerwowane dla platformy (`panel`, `www`, `api`, `admin` i inne w `RESERVED_SLUGS`) nigdy nie trafią do klienta.
 

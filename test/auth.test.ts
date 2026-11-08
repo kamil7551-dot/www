@@ -105,7 +105,7 @@ describe("panel protection", () => {
   it("sets strict security headers", async () => {
     const res = await harness().call("/login");
     expect(res.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
-    expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(res.headers.get("referrer-policy")).toBe("same-origin");
     expect(res.headers.get("cache-control")).toBe("no-store");
   });
 

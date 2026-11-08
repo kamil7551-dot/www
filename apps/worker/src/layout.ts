@@ -1,24 +1,4 @@
-import { html } from "hono/html";
-import type { HtmlEscapedString } from "hono/utils/html";
-
-type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
-
-export const page = (title: string, body: Html) => html`<!doctype html>
-  <html lang="pl">
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width,initial-scale=1" />
-      <title>${title}</title>
-      <style>
-        body{font:16px/1.5 system-ui,sans-serif;max-width:40rem;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
-        input,select,button{font:inherit;padding:.4rem .6rem}button{cursor:pointer}
-        .muted{color:#666}.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-      </style>
-    </head>
-    <body>
-      ${body}
-    </body>
-  </html>`;
+/** Shared formatting helpers for panel and storefront. */
 
 export const zl = (grosze: number) => (grosze / 100).toLocaleString("pl-PL", { style: "currency", currency: "PLN" });
 
