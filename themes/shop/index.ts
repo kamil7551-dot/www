@@ -1,7 +1,8 @@
 import { html, raw } from "hono/html";
-import { defineTheme, isSoldOut, type HomeView, type Item, type PageView } from "../../core";
+import { categoryAndChildren, defineTheme, type HomeView, type PageView } from "../../core";
 import { legalLinks } from "../legal";
-import { SHARED_CSS, groups, itemHref, telHref, zl } from "../shared";
+import { categoryHref, countLabel, productGrid, searchBox } from "../listing";
+import { SHARED_CSS, groups, telHref } from "../shared";
 
 /** accent is validated as #rrggbb when saved and read, so it is safe inside CSS. */
 const css = (accent: string) => `
@@ -9,21 +10,12 @@ const css = (accent: string) => `
 *{box-sizing:border-box}body{margin:0;font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
 a{color:var(--accent)}.wrap{max-width:72rem;margin:0 auto;padding:0 1.25rem}
 .top{border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:2}
-.top .wrap{display:flex;align-items:center;gap:1rem;min-height:3.75rem}
+.top .wrap{display:flex;align-items:center;gap:1rem;min-height:3.75rem;flex-wrap:wrap;padding-block:.5rem}
+@media(max-width:40rem){.top .search{order:3;flex-basis:100%;max-width:none}}
 .brand{display:flex;align-items:center;gap:.6rem;color:var(--ink);text-decoration:none;font-weight:800;font-size:1.15rem}
 .brand img{max-height:36px;max-width:9rem}.spacer{flex:1}
 .hero{padding:2rem 0 .5rem}.hero p{margin:.2rem 0 0;color:var(--muted);font-size:1.1rem;max-width:44rem}
-.chips{display:flex;gap:.4rem;overflow-x:auto;padding:1rem 0;scrollbar-width:none}
-.chips a{flex:none;padding:.35rem .85rem;border-radius:999px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:.95rem;background:#fff}
 h2{font-size:1.25rem;margin:1.5rem 0 .75rem}
-.grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr))}
-@media(min-width:48rem){.grid{grid-template-columns:repeat(auto-fill,minmax(14rem,1fr));gap:1.25rem}}
-.card{display:flex;flex-direction:column;color:var(--ink);text-decoration:none;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#fff}
-.card:hover{border-color:var(--accent)}.card .pic{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--soft)}
-.card .nopic{aspect-ratio:1;background:var(--soft)}
-.card .body{padding:.7rem .85rem .9rem;display:flex;flex-direction:column;gap:.2rem}
-.card .name{font-weight:600;line-height:1.3}.card .price{font-weight:700}
-.card.out{opacity:.6}.card .tag{font-size:.75rem;color:#a3271a;font-weight:700}
 main{padding-bottom:2.5rem}
 .cart-link{color:var(--ink);text-decoration:none;font-weight:600;display:flex;align-items:center;gap:.35rem}
 .cart-link .count{background:var(--accent);color:#fff;border-radius:999px;min-width:1.4rem;padding:0 .4rem;text-align:center;font-size:.8rem}
@@ -34,6 +26,7 @@ ${SHARED_CSS}`;
 const header = (v: HomeView | PageView) => html`<header class="top"><div class="wrap">
   <a class="brand" href="/">${v.settings.logoKey ? html`<img src="${v.mediaUrl(v.settings.logoKey, 320)}" alt="" />` : ""}${v.tenant.name}</a>
   <span class="spacer"></span>
+  ${v.tenant.kind === "shop" ? searchBox() : ""}
   ${v.cartCount !== undefined
     ? html`<a class="cart-link" href="/cart">Koszyk${v.cartCount ? html` <span class="count">${v.cartCount}</span>` : ""}</a>`
     : ""}
@@ -48,16 +41,8 @@ const footer = async (v: HomeView | PageView) => html`<footer><div class="wrap">
   ${await v.slot("footer", {})}
 </div></footer>`;
 
-const card = (v: HomeView, i: Item) => {
-  const out = isSoldOut(i);
-  return html`<a class="card ${out ? "out" : ""}" href="${itemHref(i)}">
-    ${i.image_key
-      ? html`<img class="pic" src="${v.mediaUrl(i.image_key, 640)}" srcset="${v.mediaUrl(i.image_key, 320)} 320w, ${v.mediaUrl(i.image_key, 640)} 640w"
-          sizes="(max-width: 48rem) 50vw, 16rem" alt="" loading="lazy" decoding="async" />`
-      : html`<span class="nopic"></span>`}
-    <span class="body"><span class="name">${i.name}</span>${out ? html`<span class="tag">Chwilowo niedostępne</span>` : html`<span class="price">${zl(i.price)}</span>`}</span>
-  </a>`;
-};
+/** Home page sections show this many products; the rest is one click away on the category page. */
+const PER_SECTION = 8;
 
 /** Small shop: product grid by category, each product with its own page. Zero JavaScript. */
 export default defineTheme({
@@ -66,6 +51,8 @@ export default defineTheme({
   kinds: ["shop"],
   home: async (v: HomeView) => {
     const sections = groups(v.items, v.categories);
+    const used = new Set(v.items.map((i) => i.category_id));
+    const top = v.categories.filter((c) => !c.parent_id && [...categoryAndChildren(v.categories, c.id)].some((id) => used.has(id)));
     return html`<!doctype html>
       <html lang="pl">
         <head>
@@ -79,12 +66,15 @@ export default defineTheme({
           ${header(v)}
           <main class="wrap">
             <div class="hero">${v.settings.tagline ? html`<p>${v.settings.tagline}</p>` : ""}</div>
-            ${sections.length > 1 ? html`<nav class="chips" aria-label="Kategorie">${sections.map((g) => html`<a href="#${g.id}">${g.title}</a>`)}</nav>` : ""}
+            ${top.length > 1 ? html`<nav class="chips" aria-label="Kategorie">${top.map((c) => html`<a href="${categoryHref(c)}">${c.name}</a>`)}</nav>` : ""}
             ${await v.slot("home.top", {})}
             ${sections.length
-              ? sections.map(
-                  (g) => html`<section id="${g.id}">${g.title ? html`<h2>${g.title}</h2>` : ""}<div class="grid">${g.items.map((i) => card(v, i))}</div></section>`,
-                )
+              ? sections.map((g) => {
+                  const category = v.categories.find((c) => c.slug === g.id);
+                  const more = g.items.length > PER_SECTION;
+                  return html`<section id="${g.id}">${g.title ? html`<h2>${g.title}</h2>` : ""}${productGrid(v.mediaUrl, more ? g.items.slice(0, PER_SECTION) : g.items)}
+                    ${more ? html`<a class="more" href="${category ? categoryHref(category) : "/produkty"}">Zobacz wszystkie: ${countLabel(g.items.length)} →</a>` : ""}</section>`;
+                })
               : html`<p>Wkrótce pojawią się tu produkty.</p>`}
             ${await v.slot("home.bottom", {})}
           </main>

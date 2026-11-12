@@ -30,6 +30,8 @@ export function forTenant(platform: Platform, d1: D1Database, tenantId: string) 
   return { db, catalog, orders, settings: new Settings(db), inbox: new Inbox(db), enabledModules, slot };
 }
 
+export { PER_PAGE, SORTS, browse, browseHref, categoryAndChildren, fold, groszeToField, parseBrowse, parsePrice } from "./browse";
+export type { BrowseQuery, BrowseResult, Sort } from "./browse";
 export { Catalog, ValidationError, isSoldOut } from "./catalog";
 export { ALLERGENS, allergenNumber, cleanAllergens, endOfDayInPoland, parseAllergens, type AllergenId } from "./allergens";
 export type { Category, Item, ItemKind, ItemStatus, NewItem } from "./catalog";

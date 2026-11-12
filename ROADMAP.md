@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-12 | Claude | Sklep: wyszukiwarka w nagłówku (`/produkty?q=`, bez polskich znaków, słowa w dowolnej kolejności, też w opisie), strony kategorii `/kategoria/<adres>` z podkategoriami, filtr ceny, sortowanie, strony po 24 produkty; na stronie głównej po 8 produktów na kategorię z linkiem „Zobacz wszystkie”; kategorie w sitemap | PR `feat/shop-filters` | Logika w `core/browse.ts` (czyste funkcje, jeden odczyt D1 na widok). Przy tysiącach produktów przenieść wyszukiwanie do SQL (FTS5). Strona kategorii bez filtrów ma canonical, wyniki wyszukiwania i filtry mają `noindex`. Karta produktu i CSS listy są wspólne (`themes/listing.ts`, `.pgrid`/`.pcard` w `SHARED_CSS`) |
 | 2026-11-12 | Claude | Wzory stron prawnych (`themes/legal.ts`): regulamin i odstąpienie od umowy w sklepie, polityka prywatności na każdej stronie, linki w stopce każdego szablonu; karta „Dane firmy” w panelu (pełna nazwa, NIP z cyfrą kontrolną, dodatkowe postanowienia); obowiązkowy checkbox regulaminu w zamówieniu | PR `feat/core-legal-pages` | To wzory, nie porada prawna: panel mówi to sprzedawcy. Zmiana treści tylko z datowaną notką tutaj. Polityka prywatności opisuje tylko ciasteczko koszyka; nowe ciasteczka lub narzędzia analityczne wymagają jej aktualizacji |
 | 2026-11-12 | Claude | Panel: zakładka „Zamówienia” z licznikiem nowych, filtr po statusie, szczegóły zamówienia, zmiana statusu z mailem do klienta; karta „Sprzedaż” w ustawieniach (odbiór osobisty, cena kuriera, numer konta) | PR `feat/panel-orders` | Ekrany zamówień są w `apps/worker/src/panel-orders.ts`, ale członkostwo nadal sprawdza `siteFor()` z `panel.ts`. Mail o statusie nie ma linku do zamówienia (trzymamy tylko skrót sekretu). Zostało w etapie 4: P24 (potrzebne konto sprzedawcy w Przelewy24), InPost, regulamin i polityka prywatności |
 | 2026-11-12 | Claude | Koszyk w ciasteczku (bez JS), formularz zamówienia z odbiorem osobistym lub kurierem, strona zamówienia dla klienta z danymi do przelewu, maile do klienta i sprzedawcy | PR `feat/storefront-cart` | Strony sklepu (`/cart`, `/checkout`, `/order/:id`) składa `themes/shop-pages.ts`, szablon tylko je opakowuje przez `page`. Działają tylko dla rodzaju `shop`. Maile idą przez `waitUntil` i ich błąd nie psuje zamówienia. Link w mailu do sprzedawcy prowadzi do `/sites/:site/orders/:id` w panelu, ten ekran dojdzie w następnym PR |
@@ -108,8 +109,8 @@ Cel: prawdziwe zamówienia i płatności.
 Cel: wygoda przy setkach i tysiącach produktów.
 
 - [ ] Szablon `large-catalog`: szerszy układ, głębokie kategorie
-- [ ] Filtry: cena, marka, parametry
-- [ ] Szybka wyszukiwarka
+- [ ] Filtry: cena, marka, parametry (cena i sortowanie gotowe; marka i parametry razem z wariantami)
+- [x] Szybka wyszukiwarka
 - [ ] Warianty produktów (rozmiar, kolor) i stany magazynowe
 - [ ] Import i eksport produktów (CSV)
 
