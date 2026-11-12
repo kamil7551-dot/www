@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { html } from "hono/html";
 import {
+  ALLERGENS,
   Media,
   MediaError,
   RESERVED_SLUGS,
@@ -9,7 +10,9 @@ import {
   auth,
   cleanSettings,
   forTenant,
+  isSoldOut,
   newId,
+  parseAllergens,
   slugify,
   type Item,
   type ItemKind,
@@ -311,17 +314,28 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
           ${items.length
             ? html`<div class="list">
                 ${items.map(
-                  (i) => html`<a href="/sites/${site.tenantId}/items/${i.id}">
-                    ${thumb(site.tenantId, i)}
-                    <div class="grow">
-                      <div class="name">${i.name}</div>
-                      <div class="sub">
-                        ${ITEM_KIND_LABEL[i.kind]}${i.category_id ? html` · ${catName.get(i.category_id) ?? ""}` : ""}
-                        <span class="pill ${i.status}">${STATUS_LABEL[i.status]}</span>
-                      </div>
-                    </div>
-                    <span class="price">${zl(i.price)}</span>
-                  </a>`,
+                  (i) => {
+                    const out = isSoldOut(i);
+                    return html`<div>
+                      <a class="rowlink" href="/sites/${site.tenantId}/items/${i.id}">
+                        ${thumb(site.tenantId, i)}
+                        <div class="grow">
+                          <div class="name">${i.name}</div>
+                          <div class="sub">
+                            ${ITEM_KIND_LABEL[i.kind]}${i.category_id ? html` · ${catName.get(i.category_id) ?? ""}` : ""}
+                            <span class="pill ${i.status}">${STATUS_LABEL[i.status]}</span>${out ? html`<span class="pill draft">Brak dziś</span>` : ""}
+                          </div>
+                        </div>
+                        <span class="price">${zl(i.price)}</span>
+                      </a>
+                      ${i.kind === "dish"
+                        ? html`<form method="post" action="/sites/${site.tenantId}/items/${i.id}/sold-out">
+                            <input type="hidden" name="soldOut" value="${out ? "0" : "1"}" />
+                            <button class="btn small ${out ? "primary" : ""}">${out ? "Znów jest" : "Brak dziś"}</button>
+                          </form>`
+                        : ""}
+                    </div>`;
+                  },
                 )}
               </div>`
             : html`<div class="card empty">Brak pozycji. Dodaj pierwszą powyżej.</div>`}`,
@@ -382,6 +396,17 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
                 </select>
               </label>
               <label class="field"><span>Opis</span><textarea name="description" maxlength="2000">${item.description}</textarea></label>
+              ${item.kind === "dish"
+                ? html`<fieldset class="field checks"><legend>Alergeny</legend>
+                    <input type="hidden" name="allergensShown" value="1" />
+                    ${ALLERGENS.map(
+                      (a) => html`<label><input type="checkbox" name="allergens" value="${a.id}" ${parseAllergens(item.allergens).includes(a.id)
+                          ? "checked"
+                          : ""} />${a.label}</label>`,
+                    )}
+                    <span class="hint">Na karcie pokażą się jako numery z legendą na dole.</span>
+                  </fieldset>`
+                : ""}
               <label class="field"><span>Zdjęcie</span>
                 ${item.image_key ? html`<img class="thumb" src="/sites/${site.tenantId}/media/${encodeURI(item.image_key)}" alt="" />` : ""}
                 <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/avif" />
@@ -406,7 +431,8 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     const current = await site.catalog.getItem(c.req.param("item"));
     if (!current) return notFound(c);
     const back = `/sites/${site.tenantId}/items/${current.id}`;
-    const form = await c.req.parseBody();
+    const form = await c.req.parseBody({ all: true });
+    const allergens = form.allergensShown ? ([] as unknown[]).concat(form.allergens ?? []).map(String) : undefined;
     const price = parsePrice(String(form.price ?? ""));
     if (price === null) return bad(c, "Niepoprawna cena. Wpisz np. 29,99.", back);
     const categoryId = String(form.categoryId ?? "");
@@ -420,6 +446,7 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
         categoryId: categoryId || null,
         status: String(form.status) as ItemStatus,
         ...(imageKey ? { imageKey } : {}),
+        ...(allergens ? { allergens } : {}),
       });
       if (imageKey && current.image_key) await site.media.delete(current.image_key);
     } catch (error) {
@@ -432,6 +459,15 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
       throw error;
     }
     return c.redirect(`${back}?ok=1`, 303);
+  });
+
+  app.post("/sites/:site/items/:item/sold-out", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const form = await c.req.parseBody();
+    const item = await site.catalog.setSoldOut(c.req.param("item"), form.soldOut === "1");
+    if (!item) return notFound(c);
+    return c.redirect(`/sites/${site.tenantId}?ok=1`, 303);
   });
 
   app.post("/sites/:site/items/:item/delete", async (c) => {

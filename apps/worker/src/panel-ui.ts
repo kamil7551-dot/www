@@ -31,6 +31,10 @@ h1{font-size:1.5rem;line-height:1.25;margin:0}h2{font-size:1.05rem;margin:0 0 .7
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.25rem;margin-bottom:1rem}
 .list{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:1rem;overflow:hidden}
 .list>a,.list>div{display:flex;align-items:center;gap:.85rem;padding:.8rem 1rem;border-top:1px solid var(--line);color:var(--text)}
+.rowlink{display:flex;align-items:center;gap:.85rem;flex:1;min-width:0;color:inherit}.rowlink:hover{text-decoration:none}.rowlink:hover .name{color:var(--accent)}
+.checks{border:0;padding:0;display:grid;gap:.35rem .75rem;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr))}
+.checks legend{font-weight:600;font-size:.875rem;margin-bottom:.35rem;padding:0}.checks label{display:flex;gap:.45rem;align-items:center}
+.checks input{width:1.1rem;min-height:1.1rem;margin:0}.checks .hint{grid-column:1/-1}
 .list>:first-child{border-top:0}.list>a:hover{background:var(--accent-soft);text-decoration:none}
 .grow{flex:1;min-width:0}.name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sub{color:var(--muted);font-size:.85rem}.price{font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -72,7 +76,7 @@ padding:.6rem 1rem;min-height:2.6rem;border:1px solid var(--line);background:var
 `;
 
 /** Bump when PANEL_CSS changes, so browsers fetch the new file. */
-export const PANEL_CSS_VERSION = "4";
+export const PANEL_CSS_VERSION = "5";
 
 const head = (title: string) => html`<meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />

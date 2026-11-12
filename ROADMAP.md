@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-12 | Claude | Menu QR: szablon `qr-card` (pasek kategorii, ceny, alergeny z legendą, przekreślone dania „brak dziś”), 14 alergenów UE przy daniach, przycisk „Brak dziś” na liście pozycji w panelu | PR `feat/qr-menu` | „Brak dziś” zapisuje `sold_out_until` = północ w Polsce, więc danie wraca samo następnego dnia; sprawdzaj przez `isSoldOut()`. Alergeny trzymamy jako id (`core/allergens.ts`), numery 1–14 to kolejność z rozporządzenia, nie zmieniaj jej. Formularz pozycji wysyła `allergensShown`, żeby odznaczenie wszystkich czyściło listę |
 | 2026-11-12 | Claude | Wizytówka: szablon `business-card` (O nas, oferta, kontakt z mapą i godzinami), formularz kontaktowy z mailem do właściciela, zakładka „Wiadomości” w panelu, pole „O nas” w ustawieniach | PR `feat/business-card` | Formularz: ukryte pole `website` łapie boty (dostają „wysłano”, nic nie zapisujemy), limit 5/h na IP i 100/dobę na stronę, POST z obcej domeny = 403. Mail idzie przez `waitUntil`, więc błąd poczty nie psuje wysyłki formularza; wiadomość i tak jest w panelu. Mapa to link do Google Maps, bez osadzania (zero JS) |
 | 2026-11-12 | Claude | SEO dla każdej strony: tytuł, opis, canonical, Open Graph, dane schema.org (`core/seo.ts`), `robots.txt`, `sitemap.xml` | PR `feat/storefront-seo` | Szablony nie budują SEO same: wstawiają gotowe `v.seo` w `<head>`. JSON-LD przez `safeJson`, żeby `</script>` w danych sprzedawcy nie zamknął tagu. Test budżetu dopuszcza tylko `<script type="application/ld+json">` |
 | 2026-11-08 | Claude | Nowy wygląd panelu: arkusz `/assets/panel.css` (bez JS, tryb ciemny, telefon), ekrany logowania, stron, pozycji z miniaturami, edycji, kategorii i ustawień | PR `feat/core-catalog` | CSP panelu nie pozwala już na style inline: style tylko w `PANEL_CSS` (`panel-ui.ts`), po zmianie podbij `PANEL_CSS_VERSION`. Referrer-Policy zmieniona na `same-origin`, bo przy `no-referrer` przeglądarki wysyłały `Origin: null` i blokowały logowanie (testy tego nie łapały, wyszło na zrzutach z prawdziwej przeglądarki). Zrzuty: /mnt/project-files/panel-screens/ |
@@ -77,8 +78,8 @@ Cel: pierwszy produkt do sprzedaży, bez płatności i kurierów.
 
 Cel: ten sam katalog jako karta dań dla gastronomii.
 
-- [ ] Szablon `qr-card`: kategorie dań, ceny, opisy, alergeny
-- [ ] Szybkie przełączanie „brak dziś” z telefonu
+- [x] Szablon `qr-card`: kategorie dań, ceny, opisy, alergeny
+- [x] Szybkie przełączanie „brak dziś” z telefonu
 - [ ] Generator kodu QR do druku (PNG i PDF)
 - [ ] Kilka wersji językowych menu (opcjonalnie)
 

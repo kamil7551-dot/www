@@ -72,7 +72,8 @@ describe("storefront theme", () => {
     const themes = testPlatform().themes.register(
       defineTheme({ id: "only-shop", name: "S", kinds: ["shop"], home: () => html`` }),
     );
-    expect(themes.pick("qr-menu", "only-shop").id).toBe("simple");
+    expect(themes.pick("qr-menu", "only-shop").id).toBe("qr-card");
+    expect(themes.pick("qr-menu", "simple").id).toBe("simple");
     expect(themes.pick("shop", "only-shop").id).toBe("only-shop");
     expect(themes.pick("shop", "missing").id).toBe("simple");
     expect(() => defineTheme({ id: "X!", name: "x", kinds: ["shop"], home: () => html`` })).toThrow();

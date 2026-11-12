@@ -10,6 +10,7 @@ import {
   type Platform,
 } from "../../../core";
 import businessCardTheme from "../../../themes/business-card";
+import qrCardTheme from "../../../themes/qr-card";
 import simpleTheme from "../../../themes/simple";
 import { panelApp } from "./panel";
 import { storefrontApp } from "./storefront";
@@ -29,7 +30,7 @@ export function createApp(deps: Deps = { mailer: defaultMailer }) {
   const platform: Platform = {
     bus: new EventBus(),
     modules: new ModuleRegistry().register(...(deps.modules ?? [])),
-    themes: new ThemeRegistry().register(businessCardTheme, simpleTheme),
+    themes: new ThemeRegistry().register(businessCardTheme, qrCardTheme, simpleTheme),
   };
   platform.modules.attach(platform.bus);
   const panel = panelApp(platform, deps.mailer);
