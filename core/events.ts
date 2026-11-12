@@ -1,4 +1,5 @@
 import type { Category, Item } from "./catalog";
+import type { Order } from "./orders";
 
 /** Events the core emits. Names and payloads only grow; never rename or repurpose one. */
 export interface CoreEvents {
@@ -8,6 +9,10 @@ export interface CoreEvents {
   "category.created": { category: Category };
   "category.updated": { category: Category };
   "category.deleted": { id: string };
+  "order.created": { order: Order };
+  "order.paid": { order: Order };
+  "order.shipped": { order: Order };
+  "order.cancelled": { order: Order };
 }
 
 export type EventName = keyof CoreEvents;

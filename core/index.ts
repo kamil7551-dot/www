@@ -3,6 +3,7 @@ import { TenantDb } from "./db";
 import type { CoreEvents, EventBus, EventName } from "./events";
 import type { ModuleRegistry } from "./modules";
 import { Inbox } from "./contact";
+import { Orders } from "./orders";
 import { Settings } from "./settings";
 import { renderSlot, type SlotContext, type SlotData, type SlotName } from "./slots";
 import type { ThemeRegistry } from "./themes";
@@ -24,7 +25,9 @@ export function forTenant(platform: Platform, d1: D1Database, tenantId: string) 
   };
   const slot = async <S extends SlotName>(name: S, data: SlotData[S], ctx: SlotContext) =>
     renderSlot(platform.modules.slotRenderers(name, await enabledModules()), data, ctx);
-  return { db, catalog: new Catalog(db, emit), settings: new Settings(db), inbox: new Inbox(db), enabledModules, slot };
+  const catalog = new Catalog(db, emit);
+  const orders = new Orders(db, emit, (ids) => catalog.getItems(ids));
+  return { db, catalog, orders, settings: new Settings(db), inbox: new Inbox(db), enabledModules, slot };
 }
 
 export { Catalog, ValidationError, isSoldOut } from "./catalog";
@@ -39,7 +42,7 @@ export { slugify } from "./slug";
 export { CONTACT_LIMIT_PER_IP_HOUR, Inbox } from "./contact";
 export type { ContactMessage } from "./contact";
 export { itemSeoHead, robotsTxt, safeJson, seoHead, sitemapXml } from "./seo";
-export { DEFAULT_SETTINGS, Settings, cleanSettings } from "./settings";
+export { DEFAULT_SETTINGS, Settings, cleanIban, cleanSettings, formatIban } from "./settings";
 export type { SiteSettings } from "./settings";
 export type { SlotData, SlotName, SlotRenderer } from "./slots";
 export { ThemeRegistry, defineTheme } from "./themes";
@@ -52,3 +55,5 @@ export { ConsoleMailer, ResendMailer } from "./mailer";
 export type { Mail, Mailer } from "./mailer";
 export type { SiteKind, Tenant } from "./tenants";
 export { qrMatrix, qrPng, qrSvg } from "./qr";
+export { MAX_CART_LINES, MAX_QTY, ORDER_STATUSES, Orders, deliveryOptions } from "./orders";
+export type { CartLine, Checkout, Delivery, Order, OrderLine, OrderStatus, Payment, PricedCart } from "./orders";

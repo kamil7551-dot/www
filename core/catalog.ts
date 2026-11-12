@@ -120,6 +120,15 @@ export class Catalog {
     return this.db.first<Item>(`SELECT ${ITEM_COLUMNS} FROM items WHERE tenant_id = ?1 AND id = ?2`, id);
   }
 
+  /** Several items at once, e.g. everything in a cart. Unknown ids are skipped. */
+  getItems(ids: string[]): Promise<Item[]> {
+    if (!ids.length) return Promise.resolve([]);
+    return this.db.all<Item>(
+      `SELECT ${ITEM_COLUMNS} FROM items WHERE tenant_id = ?1 AND id IN (SELECT value FROM json_each(?2)) ORDER BY position, name`,
+      JSON.stringify(ids),
+    );
+  }
+
   getItemBySlug(slug: string): Promise<Item | null> {
     return this.db.first<Item>(`SELECT ${ITEM_COLUMNS} FROM items WHERE tenant_id = ?1 AND slug = ?2`, slug);
   }
