@@ -34,6 +34,7 @@ export type { CoreEvents, EventName } from "./events";
 export { ModuleRegistry, defineModule } from "./modules";
 export type { ModuleDefinition } from "./modules";
 export { slugify } from "./slug";
+export { robotsTxt, safeJson, seoHead, sitemapXml } from "./seo";
 export { DEFAULT_SETTINGS, Settings, cleanSettings } from "./settings";
 export type { SiteSettings } from "./settings";
 export type { SlotData, SlotName, SlotRenderer } from "./slots";

@@ -62,7 +62,8 @@ describe("storefront theme", () => {
     expect(body).toContain("--accent:#123456");
     expect(body).toContain("Serwis &lt;b&gt;komputerów&lt;/b&gt;");
     expect(body).toContain('href="tel:+48600100200"');
-    expect(body.indexOf("Naprawy")).toBeLessThan(body.indexOf("Wymiana dysku"));
+    const main = body.slice(body.indexOf("<main>"));
+    expect(main.indexOf("Naprawy")).toBeLessThan(main.indexOf("Wymiana dysku"));
     expect(body).toContain("Pozostałe");
     expect(body).not.toContain("Szkic");
   });
@@ -155,8 +156,35 @@ describe("performance budget (AGENTS.md)", () => {
     const s = await site("budzet");
     for (let i = 0; i < 50; i++) await s.catalog.createItem({ kind: "product", name: `Produkt ${i}`, price: 1000 + i });
     const { body } = await render("budzet");
-    expect(body).not.toMatch(/<script/i);
+    expect(body).not.toMatch(/<script(?![^>]*application\/ld\+json)/i);
     const gzipped = await new Response(new Blob([body]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
     expect(gzipped.byteLength).toBeLessThan(100 * 1024);
+  });
+});
+
+describe("SEO", () => {
+  it("adds title, description, canonical and safe schema.org data", async () => {
+    const s = await site("seo-firma", "business-card");
+    await s.settings.update({ tagline: "Naprawy </script><script>alert(1)</script>", phone: "+48 600 100 200" });
+    await s.catalog.createItem({ kind: "service", name: "Diagnoza", price: 7990 });
+    const { body } = await render("seo-firma");
+    expect(body).toContain('<link rel="canonical" href="https://seo-firma.localhost/"');
+    expect(body).toContain('"@type":"LocalBusiness"');
+    expect(body).toContain('"telephone":"+48 600 100 200"');
+    expect(body).toContain('"price":"79.90"');
+    const ld = body.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]!;
+    expect(ld).not.toContain("<");
+    expect(JSON.parse(ld).description).toContain("</script>");
+    expect(body.match(/<script/g)).toHaveLength(1);
+  });
+
+  it("serves robots.txt and a sitemap for every site", async () => {
+    await site("mapa");
+    const app = createApp({ mailer: () => noMail });
+    const get = (p: string) => app.fetch(new Request(`https://mapa.localhost${p}`), env, createExecutionContext());
+    expect(await (await get("/robots.txt")).text()).toContain("Sitemap: https://mapa.localhost/sitemap.xml");
+    const sitemap = await get("/sitemap.xml");
+    expect(sitemap.headers.get("content-type")).toContain("application/xml");
+    expect(await sitemap.text()).toContain("<loc>https://mapa.localhost/</loc>");
   });
 });

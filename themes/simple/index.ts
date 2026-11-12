@@ -24,8 +24,7 @@ export default defineTheme({
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width,initial-scale=1" />
-          <title>${v.tenant.name}</title>
-          ${s.tagline ? html`<meta name="description" content="${s.tagline}" />` : ""}
+          ${v.seo}
           <style>
             :root{--accent:${s.accent}}
             *{box-sizing:border-box}body{margin:0;font:17px/1.55 system-ui,sans-serif;color:#1b1b1b;background:#fff}
