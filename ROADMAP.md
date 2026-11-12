@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-06 | Claude | Szkielet projektu: Hono na Workers, D1 z pierwszą migracją (`tenants`), Vitest, ESLint, CI, szablon PR | PR `feat/infra-scaffold` | `worker-configuration.d.ts` nie jest w repo, generuje go `pnpm types` (uruchamiane automatycznie przez typecheck i test). `database_id` w wrangler.jsonc to atrapa do czasu pierwszego wdrożenia. Następne: etap 1, model danych katalogu |
 | 2026-11-06 | Claude | Dodano tabelę „W toku” i dziennik prac | PR `docs/work-log` | Wypełniaj obie tabele zgodnie z AGENTS.md, sekcja „Zapisywanie pracy” |
 | 2026-11-06 | Claude | Dodano AGENTS.md, ROADMAP.md, INSTRUCTIONS.md | commit startowy na `main` | Następne zadanie: szkielet projektu z etapu 0 |
 
@@ -29,10 +30,10 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 Cel: puste, ale działające repozytorium, w którym każdy agent może bezpiecznie pracować.
 
 - [x] AGENTS.md, ROADMAP.md, INSTRUCTIONS.md
-- [ ] Szkielet projektu: pnpm, TypeScript, Hono, Wrangler, Vitest
-- [ ] CI na GitHubie: typecheck, lint, testy przy każdym PR
-- [ ] Lokalne uruchamianie (`pnpm dev`) z lokalną bazą D1
-- [ ] Szablon opisu PR zgodny z AGENTS.md
+- [x] Szkielet projektu: pnpm, TypeScript, Hono, Wrangler, Vitest
+- [x] CI na GitHubie: typecheck, lint, testy przy każdym PR
+- [x] Lokalne uruchamianie (`pnpm dev`) z lokalną bazą D1
+- [x] Szablon opisu PR zgodny z AGENTS.md
 
 ## Etap 1: Rdzeń i katalog
 
