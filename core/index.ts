@@ -51,3 +51,4 @@ export * as auth from "./auth";
 export { ConsoleMailer, ResendMailer } from "./mailer";
 export type { Mail, Mailer } from "./mailer";
 export type { SiteKind, Tenant } from "./tenants";
+export { qrMatrix, qrPng, qrSvg } from "./qr";

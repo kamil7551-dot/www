@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-12 | Claude | Zakładka „Kod QR” w panelu: kod do strony (własna domena, jeśli jest), pobieranie PNG i SVG, arkusz A4 do druku (1 duży albo 6 na stoliki); formularz dodawania pozycji podpowiada rodzaj według typu strony | PR `feat/qr-code` | Kod generuje `uqr` tylko po stronie serwera (0 KB JS u klienta); PNG składamy sami (`core/qr.ts`, CompressionStream). PDF = druk z przeglądarki, bez biblioteki PDF. `jsqr` jest tylko w testach i sprawdza, że kod da się zeskanować. Do zrobienia: kolejność kategorii w panelu (teraz alfabetycznie, bo wszystkie mają `position` 0) |
 | 2026-11-12 | Claude | Menu QR: szablon `qr-card` (pasek kategorii, ceny, alergeny z legendą, przekreślone dania „brak dziś”), 14 alergenów UE przy daniach, przycisk „Brak dziś” na liście pozycji w panelu | PR `feat/qr-menu` | „Brak dziś” zapisuje `sold_out_until` = północ w Polsce, więc danie wraca samo następnego dnia; sprawdzaj przez `isSoldOut()`. Alergeny trzymamy jako id (`core/allergens.ts`), numery 1–14 to kolejność z rozporządzenia, nie zmieniaj jej. Formularz pozycji wysyła `allergensShown`, żeby odznaczenie wszystkich czyściło listę |
 | 2026-11-12 | Claude | Wizytówka: szablon `business-card` (O nas, oferta, kontakt z mapą i godzinami), formularz kontaktowy z mailem do właściciela, zakładka „Wiadomości” w panelu, pole „O nas” w ustawieniach | PR `feat/business-card` | Formularz: ukryte pole `website` łapie boty (dostają „wysłano”, nic nie zapisujemy), limit 5/h na IP i 100/dobę na stronę, POST z obcej domeny = 403. Mail idzie przez `waitUntil`, więc błąd poczty nie psuje wysyłki formularza; wiadomość i tak jest w panelu. Mapa to link do Google Maps, bez osadzania (zero JS) |
 | 2026-11-12 | Claude | SEO dla każdej strony: tytuł, opis, canonical, Open Graph, dane schema.org (`core/seo.ts`), `robots.txt`, `sitemap.xml` | PR `feat/storefront-seo` | Szablony nie budują SEO same: wstawiają gotowe `v.seo` w `<head>`. JSON-LD przez `safeJson`, żeby `</script>` w danych sprzedawcy nie zamknął tagu. Test budżetu dopuszcza tylko `<script type="application/ld+json">` |
@@ -80,7 +81,7 @@ Cel: ten sam katalog jako karta dań dla gastronomii.
 
 - [x] Szablon `qr-card`: kategorie dań, ceny, opisy, alergeny
 - [x] Szybkie przełączanie „brak dziś” z telefonu
-- [ ] Generator kodu QR do druku (PNG i PDF)
+- [x] Generator kodu QR do druku (PNG, SVG i arkusz A4 do zapisu jako PDF)
 - [ ] Kilka wersji językowych menu (opcjonalnie)
 
 ## Etap 4: Sklep mały

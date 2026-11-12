@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
-import { html } from "hono/html";
+import { html, raw } from "hono/html";
 import {
   ALLERGENS,
   Media,
@@ -13,6 +13,8 @@ import {
   isSoldOut,
   newId,
   parseAllergens,
+  qrPng,
+  qrSvg,
   slugify,
   type Item,
   type ItemKind,
@@ -23,7 +25,7 @@ import {
   type SiteSettings,
 } from "../../../core";
 import { parsePrice, zl } from "./layout";
-import { PANEL_CSS, authPage, notice, panelPage, type SiteNav } from "./panel-ui";
+import { PANEL_CSS, PANEL_CSS_VERSION, authPage, notice, panelPage, type SiteNav } from "./panel-ui";
 
 export const SESSION_COOKIE = "__Host-sid";
 
@@ -229,22 +231,23 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     const tenantId = c.req.param("site") ?? "";
     const role = await auth.membership(c.env.DB, c.get("user").userId, tenantId);
     if (!role) return null;
-    const tenant = await c.env.DB.prepare("SELECT name, slug FROM tenants WHERE id = ?1")
+    const tenant = await c.env.DB.prepare("SELECT name, slug, kind FROM tenants WHERE id = ?1")
       .bind(tenantId)
-      .first<{ name: string; slug: string }>();
+      .first<{ name: string; slug: string; kind: string }>();
     if (!tenant) return null;
     const api = forTenant(platform, c.env.DB, tenantId);
     const unread = await api.inbox.unreadCount();
     const url = new URL(c.req.url);
+    const publicUrl = `${url.protocol}//${tenant.slug}.${c.env.PLATFORM_DOMAIN}${url.port ? `:${url.port}` : ""}/`;
     const nav = (active: SiteNav["active"]): SiteNav => ({
       id: tenantId,
       name: tenant.name,
-      publicUrl: `${url.protocol}//${tenant.slug}.${c.env.PLATFORM_DOMAIN}${url.port ? `:${url.port}` : ""}/`,
+      publicUrl,
       isOwner: role === "owner",
       active,
       unread: active === "messages" ? 0 : unread,
     });
-    return { tenantId, role, nav, media: new Media(c.env.MEDIA, tenantId, c.env.IMAGES), ...api };
+    return { tenantId, role, nav, tenant, publicUrl, media: new Media(c.env.MEDIA, tenantId, c.env.IMAGES), ...api };
   }
 
   const notFound = (c: C) => c.text("Nie znaleziono", 404);
@@ -284,6 +287,9 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     return new Response(object.body, { headers });
   });
 
+  /** What sellers of each site kind add most often, preselected in the "add item" form. */
+  const DEFAULT_ITEM_KIND: Record<string, ItemKind> = { "qr-menu": "dish", "business-card": "service", shop: "product" };
+
   const thumb = (siteId: string, item: Item) =>
     item.image_key
       ? html`<img class="thumb" src="/sites/${siteId}/media/${encodeURI(item.image_key)}" alt="" loading="lazy" />`
@@ -306,7 +312,9 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
               <input name="name" placeholder="Nazwa" required maxlength="120" aria-label="Nazwa" />
               <input name="price" placeholder="Cena, np. 29,99" required inputmode="decimal" aria-label="Cena" />
               <select name="kind" aria-label="Rodzaj">
-                ${(Object.keys(ITEM_KIND_LABEL) as ItemKind[]).map((k) => html`<option value="${k}">${ITEM_KIND_LABEL[k]}</option>`)}
+                ${(Object.keys(ITEM_KIND_LABEL) as ItemKind[]).map(
+                  (k) => html`<option value="${k}" ${k === DEFAULT_ITEM_KIND[site.tenant.kind] ? "selected" : ""}>${ITEM_KIND_LABEL[k]}</option>`,
+                )}
               </select>
               <button class="btn primary">Dodaj</button>
             </form>
@@ -564,6 +572,94 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     if (!site) return notFound(c);
     await site.inbox.delete(c.req.param("id"));
     return c.redirect(`/sites/${site.tenantId}/messages?ok=1`, 303);
+  });
+
+  // ---------- QR code for tables, windows and flyers: any member ----------
+
+  /** The address printed in the code: the site's own domain when it has one, otherwise its subdomain. */
+  async function qrTarget(c: C, site: { tenantId: string; publicUrl: string }) {
+    const own = await c.env.DB.prepare("SELECT domain FROM tenant_domains WHERE tenant_id = ?1 ORDER BY domain LIMIT 1")
+      .bind(site.tenantId)
+      .first<{ domain: string }>();
+    return own ? `https://${own.domain}/` : site.publicUrl;
+  }
+
+  const qrCaption = (kind: string) => (kind === "qr-menu" ? "Zeskanuj, aby zobaczyć menu" : "Zeskanuj, aby odwiedzić naszą stronę");
+
+  app.get("/sites/:site/qr", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const target = await qrTarget(c, site);
+    const base = `/sites/${site.tenantId}/qr`;
+    return c.html(
+      panelPage({
+        title: "Kod QR",
+        email: c.get("user").email,
+        site: site.nav("qr"),
+        body: html`<div class="card qr-card">
+          <div class="qr">${raw(qrSvg(target, { label: `Kod QR: ${target}` }))}</div>
+          <div class="grow">
+            <h2>Kod QR Twojej strony</h2>
+            <p class="sub">Prowadzi do <a href="${target}" target="_blank" rel="noopener">${target}</a>. Kod się nie zmienia, więc raz wydrukowany działa zawsze, także po zmianie menu.</p>
+            <div class="inline">
+              <a class="btn primary" href="${base}/print?n=1">Wydruk: jeden duży</a>
+              <a class="btn" href="${base}/print?n=6">Wydruk: 6 na stoliki</a>
+            </div>
+            <div class="inline">
+              <a class="btn small" href="${base}.png" download>Pobierz PNG</a>
+              <a class="btn small" href="${base}.svg" download>Pobierz SVG</a>
+            </div>
+            <p class="hint">PDF: otwórz wydruk i wybierz „Drukuj”, a potem „Zapisz jako PDF”. SVG nadaje się dla drukarni, PNG do social mediów.</p>
+          </div>
+        </div>`,
+      }),
+    );
+  });
+
+  app.get("/sites/:site/qr.svg", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    return c.body(qrSvg(await qrTarget(c, site)), 200, {
+      "content-type": "image/svg+xml",
+      "content-disposition": `attachment; filename="kod-qr-${site.tenant.slug}.svg"`,
+    });
+  });
+
+  app.get("/sites/:site/qr.png", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    return c.body((await qrPng(await qrTarget(c, site))).buffer as ArrayBuffer, 200, {
+      "content-type": "image/png",
+      "content-disposition": `attachment; filename="kod-qr-${site.tenant.slug}.png"`,
+    });
+  });
+
+  app.get("/sites/:site/qr/print", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const target = await qrTarget(c, site);
+    const many = c.req.query("n") === "6";
+    const svg = raw(qrSvg(target));
+    const card = html`<div class="qr-print-card">
+      <div class="qr">${svg}</div>
+      <strong>${site.tenant.name}</strong>
+      <span>${qrCaption(site.tenant.kind)}</span>
+      <small>${target.replace(/^https?:\/\//, "").replace(/\/$/, "")}</small>
+    </div>`;
+    return c.html(html`<!doctype html>
+      <html lang="pl">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width,initial-scale=1" />
+          <meta name="robots" content="noindex" />
+          <title>Kod QR do druku · ${site.tenant.name}</title>
+          <link rel="stylesheet" href="/assets/panel.css?v=${PANEL_CSS_VERSION}" />
+        </head>
+        <body class="qr-sheet">
+          <p class="noprint"><a href="/sites/${site.tenantId}/qr">← Wróć</a> · Wybierz w przeglądarce „Drukuj” (Ctrl+P, na telefonie: Udostępnij → Drukuj), a potem „Zapisz jako PDF” albo swoją drukarkę.</p>
+          <main class="${many ? "six" : "one"}">${many ? Array.from({ length: 6 }, () => card) : card}</main>
+        </body>
+      </html>`);
   });
 
   // ---------- Site settings: owners only ----------
