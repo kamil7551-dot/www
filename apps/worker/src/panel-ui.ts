@@ -60,6 +60,15 @@ padding:.6rem 1rem;min-height:2.6rem;border:1px solid var(--line);background:var
 .actions{display:flex;gap:.5rem;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:.5rem}
 .note{border-radius:8px;padding:.7rem .9rem;margin-bottom:1rem;font-weight:500}
 .note.ok{background:var(--ok-soft);color:var(--ok)}.note.err{background:var(--danger-soft);color:var(--danger)}
+.qr-card{display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start}.qr-card .qr{width:12rem;flex:none}
+.qr svg{display:block;width:100%;height:auto}.qr-card .inline{margin:.75rem 0}
+.qr-sheet{background:#fff;color:#000;padding:1rem}.qr-sheet main{display:grid;gap:0;margin:0 auto}
+.qr-sheet .one{max-width:150mm}.qr-sheet .six{grid-template-columns:1fr 1fr;max-width:190mm}
+.qr-print-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:.3rem;padding:6mm;border:1px dashed #bbb;break-inside:avoid}
+.qr-print-card .qr{width:100%;max-width:120mm}.six .qr-print-card .qr{max-width:55mm}
+.qr-print-card strong{font-size:1.5rem}.six .qr-print-card strong{font-size:1.1rem}.qr-print-card small{color:#555}
+.one .qr-print-card{border:0;font-size:1.3rem}
+@page{size:A4;margin:12mm}@media print{.noprint{display:none}.qr-sheet{padding:0}}
 .empty{text-align:center;color:var(--muted);padding:2rem 1rem}
 .count{display:inline-block;min-width:1.25rem;padding:0 .35rem;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.75rem;text-align:center}
 .msg{display:block!important}.msg.new{background:var(--accent-soft)}.msg p{margin:.5rem 0 .25rem;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -76,7 +85,7 @@ padding:.6rem 1rem;min-height:2.6rem;border:1px solid var(--line);background:var
 `;
 
 /** Bump when PANEL_CSS changes, so browsers fetch the new file. */
-export const PANEL_CSS_VERSION = "5";
+export const PANEL_CSS_VERSION = "6";
 
 const head = (title: string) => html`<meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -101,7 +110,7 @@ export interface SiteNav {
   name: string;
   publicUrl: string;
   isOwner: boolean;
-  active: "items" | "categories" | "messages" | "settings";
+  active: "items" | "categories" | "messages" | "qr" | "settings";
   /** Unread contact form messages, shown as a badge on the tab. */
   unread: number;
 }
@@ -134,6 +143,7 @@ export function panelPage(opts: { title: string; email: string; site?: SiteNav; 
                 <nav class="tabs">
                   ${tab("items", `/sites/${s.id}`, "Pozycje")} ${tab("categories", `/sites/${s.id}/categories`, "Kategorie")}
                   ${tab("messages", `/sites/${s.id}/messages`, html`Wiadomości${s.unread ? html` <span class="count">${s.unread}</span>` : ""}`)}
+                  ${tab("qr", `/sites/${s.id}/qr`, "Kod QR")}
                   ${s.isOwner ? tab("settings", `/sites/${s.id}/settings`, "Ustawienia") : ""}
                 </nav>`
             : ""}

@@ -109,3 +109,12 @@ describe("panel", () => {
     expect((await other.call(`${itemPath}/sold-out`, { form: { soldOut: "1" } })).status).toBe(404);
   });
 });
+
+describe("add item form", () => {
+  it("preselects dishes for menus and services for business cards", async () => {
+    const h = harness();
+    await h.login(uniqueEmail());
+    expect(await (await h.call(await h.newSite("Menu domyślne", "qr-menu"))).text()).toMatch(/<option value="dish" selected/);
+    expect(await (await h.call(await h.newSite("Wizytówka domyślna", "business-card"))).text()).toMatch(/<option value="service" selected/);
+  });
+});
