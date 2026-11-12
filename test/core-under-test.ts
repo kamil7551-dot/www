@@ -1,0 +1,14 @@
+import { env } from "cloudflare:workers";
+import { EventBus, ModuleRegistry, ThemeRegistry, forTenant, type Platform } from "../core";
+import simpleTheme from "../themes/simple";
+
+export * from "../core";
+export type { Mail } from "../core";
+
+export function forTenantForTest(tenantId: string, platform?: Platform) {
+  return forTenant(platform ?? testPlatform(), env.DB, tenantId);
+}
+
+export function testPlatform(): Platform {
+  return { bus: new EventBus(), modules: new ModuleRegistry(), themes: new ThemeRegistry().register(simpleTheme) };
+}

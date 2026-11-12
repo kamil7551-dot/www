@@ -84,8 +84,15 @@ Zasady modułów:
 4. Moduł dodaje do strony klienta jak najmniej JS i CSS. Każdy dodany JS podaj w opisie PR (rozmiar po gzip).
 5. Teksty widoczne dla użytkownika idą przez pliki tłumaczeń (`pl` jako pierwszy język), nie są wpisane na sztywno.
 
-Zdarzenia rdzenia (lista będzie rosła, zmiany tylko przez PR do rdzenia):
-`product.created`, `product.updated`, `product.deleted`, `order.created`, `order.paid`, `order.shipped`, `order.cancelled`, `customer.created`, `page.render`.
+Zdarzenia rdzenia (pełna lista z typami w `core/events.ts`; zmiany tylko przez PR do rdzenia):
+- dostępne: `item.created`, `item.updated`, `item.deleted`, `category.created`,
+- planowane: `order.created`, `order.paid`, `order.shipped`, `order.cancelled`, `customer.created`, `page.render`.
+
+Sloty (miejsca na stronie, gdzie moduł dokleja treść) są opisane w `core/slots.ts`. Treść slotu buduj przez `html```` z `hono/html`; zwykły tekst zostanie zamieniony na bezpieczny tekst, nie na HTML.
+
+Szablony stron to katalogi `themes/<id>/` eksportujące `defineTheme({ id, name, kinds, home })`. Szablon dostaje gotowe dane (`HomeView`) i nie sięga do bazy ani do sieci.
+
+Zapytania SQL w rdzeniu idą przez `TenantDb` (`core/db.ts`): `?1` to zawsze `tenant_id`, kolejne parametry od `?2`. Zapytanie bez `tenant_id` zostanie odrzucone przed wykonaniem.
 
 ## Budżet wydajności strony klienta
 
@@ -104,6 +111,7 @@ PR, który przekracza budżet, nie zostanie zmergowany bez zgody Kamila.
 - Commity w stylu Conventional Commits: `feat(module-inpost): add locker picker`.
 - Każdy PR zawiera testy dla nowej logiki i przechodzi: `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 - Zmiany w `core/`, `migrations/` i `AGENTS.md` wymagają przeglądu Claude jako architekta. W opisie PR zaznacz, że dotyka rdzenia.
+- Zmiany w logowaniu, sesjach i panelu: najpierw przeczytaj [docs/SECURITY.md](docs/SECURITY.md); każda trasa panelu z identyfikatorem strony sprawdza członkostwo (`siteFor()` w `panel.ts`).
 - Żadnych sekretów w repozytorium. Klucze API tylko przez `wrangler secret`.
 - Nie zmieniaj nazw ani znaczenia istniejących zdarzeń, kolumn i id modułów; dodawaj nowe obok.
 

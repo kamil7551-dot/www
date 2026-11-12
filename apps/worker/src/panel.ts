@@ -1,0 +1,567 @@
+import { Hono, type Context } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { html } from "hono/html";
+import {
+  Media,
+  MediaError,
+  RESERVED_SLUGS,
+  ValidationError,
+  auth,
+  cleanSettings,
+  forTenant,
+  newId,
+  slugify,
+  type Item,
+  type ItemKind,
+  type ItemStatus,
+  type Mailer,
+  type Platform,
+  type SiteKind,
+  type SiteSettings,
+} from "../../../core";
+import { parsePrice, zl } from "./layout";
+import { PANEL_CSS, authPage, notice, panelPage, type SiteNav } from "./panel-ui";
+
+export const SESSION_COOKIE = "__Host-sid";
+
+type PanelEnv = { Bindings: Env; Variables: { user: auth.SessionUser } };
+type C = Context<PanelEnv>;
+
+const SECURITY_HEADERS: Record<string, string> = {
+  "content-security-policy":
+    "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  // "same-origin": no referrer leaves the panel (so a login token in the URL never leaks), while the panel
+  // still gets a real Origin header on its own forms. "no-referrer" would make browsers send "Origin: null".
+  "referrer-policy": "same-origin",
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
+};
+
+const KIND_LABEL: Record<SiteKind, string> = { shop: "Sklep", "business-card": "Wizytówka", "qr-menu": "Menu QR" };
+const ITEM_KIND_LABEL: Record<ItemKind, string> = { product: "Produkt", service: "Usługa", dish: "Danie" };
+const STATUS_LABEL: Record<ItemStatus, string> = { active: "Widoczna", hidden: "Ukryta", draft: "Szkic" };
+
+/** "29,99" for a form field. */
+const priceField = (grosze: number) => (grosze / 100).toFixed(2).replace(".", ",");
+
+export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
+  const app = new Hono<PanelEnv>();
+
+  app.use("*", async (c, next) => {
+    // Cross-site form posts are refused: a POST must come from the panel's own pages.
+    if (c.req.method !== "GET" && c.req.method !== "HEAD" && c.req.header("origin") !== new URL(c.req.url).origin) {
+      return c.text("Niedozwolone żądanie", 403);
+    }
+    await next();
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) c.res.headers.set(k, v);
+    if (!c.res.headers.has("cache-control")) c.res.headers.set("cache-control", "no-store");
+  });
+
+  app.get("/assets/panel.css", (c) =>
+    c.body(PANEL_CSS, 200, {
+      "content-type": "text/css; charset=utf-8",
+      "cache-control": "public, max-age=31536000, immutable",
+    }),
+  );
+
+  // ---------- Signing in ----------
+
+  app.get("/login", (c) =>
+    c.html(
+      authPage(
+        "Logowanie",
+        html`<h1>Zaloguj się</h1>
+          <p>Podaj e-mail, a wyślemy Ci link do logowania. Bez hasła.</p>
+          <form method="post" action="/login">
+            <label class="field"><span>E-mail</span><input type="email" name="email" required autocomplete="email" autofocus /></label>
+            <button class="btn primary block">Wyślij link</button>
+          </form>`,
+      ),
+    ),
+  );
+
+  app.post("/login", async (c) => {
+    const form = await c.req.parseBody();
+    const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+    const result = await auth.requestLogin(c.env.DB, String(form.email ?? ""), ip);
+    if (result.ok) {
+      const link = `${new URL(c.req.url).origin}/login/verify?t=${result.token}`;
+      try {
+        await mailer(c.env).send({
+          to: result.email,
+          subject: "Twój link do logowania",
+          text: `Kliknij, aby się zalogować (link działa 15 minut i tylko raz):\n\n${link}\n\nJeśli to nie Ty, zignoruj tę wiadomość.`,
+        });
+      } catch (error) {
+        console.error("Login mail failed", error);
+      }
+    }
+    // Same answer whatever happened, so nobody can learn which e-mails have accounts.
+    return c.html(
+      authPage(
+        "Sprawdź skrzynkę",
+        html`<h1>Sprawdź skrzynkę</h1>
+          <p>Jeśli adres jest poprawny, za chwilę dostaniesz link do logowania. Działa 15 minut i tylko raz.</p>
+          <a class="btn block" href="/login">Wpisz inny adres</a>`,
+      ),
+    );
+  });
+
+  // Mail scanners open links automatically, so opening the link only shows a button; the POST logs in.
+  app.get("/login/verify", (c) =>
+    c.html(
+      authPage(
+        "Potwierdź logowanie",
+        html`<h1>Prawie gotowe</h1>
+          <p>Kliknij, aby zalogować się na tym urządzeniu.</p>
+          <form method="post" action="/login/verify">
+            <input type="hidden" name="t" value="${c.req.query("t") ?? ""}" />
+            <button class="btn primary block">Zaloguj mnie</button>
+          </form>`,
+      ),
+    ),
+  );
+
+  app.post("/login/verify", async (c) => {
+    const form = await c.req.parseBody();
+    const session = await auth.consumeLogin(c.env.DB, String(form.t ?? ""), c.req.header("user-agent") ?? "");
+    if (!session) {
+      return c.html(
+        authPage(
+          "Link nieważny",
+          html`<h1>Ten link już nie działa</h1>
+            <p>Wygasł albo był już użyty. Wyślij sobie nowy.</p>
+            <a class="btn primary block" href="/login">Wyślij nowy link</a>`,
+        ),
+        400,
+      );
+    }
+    setCookie(c, SESSION_COOKIE, session.sessionToken, {
+      path: "/",
+      secure: true,
+      httpOnly: true,
+      sameSite: "Lax",
+      maxAge: auth.SESSION_IDLE_TTL,
+    });
+    return c.redirect("/", 303);
+  });
+
+  app.post("/logout", async (c) => {
+    await auth.destroySession(c.env.DB, getCookie(c, SESSION_COOKIE));
+    deleteCookie(c, SESSION_COOKIE, { path: "/", secure: true });
+    return c.redirect("/login", 303);
+  });
+
+  // ---------- Everything below needs a logged-in user ----------
+
+  app.use("*", async (c, next) => {
+    const user = await auth.getSession(c.env.DB, getCookie(c, SESSION_COOKIE));
+    if (!user) return c.redirect("/login", 303);
+    c.set("user", user);
+    await next();
+  });
+
+  const savedNotice = (c: C) => (c.req.query("ok") ? notice("ok", "Zapisano.") : "");
+
+  app.get("/", async (c) => {
+    const sites = await auth.sitesOf(c.env.DB, c.get("user").userId);
+    return c.html(
+      panelPage({
+        title: "Twoje strony",
+        email: c.get("user").email,
+        body: html`<div class="head"><h1>Twoje strony</h1></div>
+          ${sites.length
+            ? html`<div class="list">
+                ${sites.map(
+                  (s) => html`<a href="/sites/${s.id}">
+                    <div class="grow"><div class="name">${s.name}</div><div class="sub">${KIND_LABEL[s.kind as SiteKind] ?? s.kind} · ${s.slug}</div></div>
+                    <span class="sub">→</span>
+                  </a>`,
+                )}
+              </div>`
+            : html`<div class="card empty">Nie masz jeszcze żadnej strony. Załóż pierwszą poniżej.</div>`}
+          <div class="card">
+            <h2>Nowa strona</h2>
+            <form method="post" action="/sites">
+              <div class="kinds">
+                <label><input type="radio" name="kind" value="business-card" required />Wizytówka<small>firma, usługi, kontakt</small></label>
+                <label><input type="radio" name="kind" value="qr-menu" />Menu QR<small>karta dań do stolika</small></label>
+                <label><input type="radio" name="kind" value="shop" checked />Sklep<small>produkty i zamówienia</small></label>
+              </div>
+              <div class="inline">
+                <input name="name" placeholder="Nazwa, np. Serwis Laptopów Kowalski" required maxlength="80" />
+                <button class="btn primary">Utwórz</button>
+              </div>
+            </form>
+          </div>`,
+      }),
+    );
+  });
+
+  app.post("/sites", async (c) => {
+    const form = await c.req.parseBody();
+    const name = String(form.name ?? "").trim().slice(0, 80);
+    const kind = String(form.kind ?? "");
+    if (!name || !(kind in KIND_LABEL)) return bad(c, "Podaj nazwę i wybierz rodzaj strony.");
+    let slug = slugify(name) || "strona";
+    if (RESERVED_SLUGS.has(slug)) slug = `${slug}-1`;
+    const taken = await c.env.DB.prepare("SELECT 1 FROM tenants WHERE slug = ?1").bind(slug).first();
+    if (taken) slug = `${slug}-${crypto.randomUUID().slice(0, 4)}`;
+    const id = newId();
+    await c.env.DB.batch([
+      c.env.DB.prepare("INSERT INTO tenants (id, slug, name, kind) VALUES (?1, ?2, ?3, ?4)").bind(id, slug, name, kind),
+      c.env.DB.prepare("INSERT INTO memberships (user_id, tenant_id, role) VALUES (?1, ?2, 'owner')").bind(
+        c.get("user").userId,
+        id,
+      ),
+    ]);
+    return c.redirect(`/sites/${id}`, 303);
+  });
+
+  // ---------- One site ----------
+
+  /** Returns the site's core API only if the logged-in user is a member; otherwise null. */
+  async function siteFor(c: C) {
+    const tenantId = c.req.param("site") ?? "";
+    const role = await auth.membership(c.env.DB, c.get("user").userId, tenantId);
+    if (!role) return null;
+    const tenant = await c.env.DB.prepare("SELECT name, slug FROM tenants WHERE id = ?1")
+      .bind(tenantId)
+      .first<{ name: string; slug: string }>();
+    if (!tenant) return null;
+    const url = new URL(c.req.url);
+    const nav = (active: SiteNav["active"]): SiteNav => ({
+      id: tenantId,
+      name: tenant.name,
+      publicUrl: `${url.protocol}//${tenant.slug}.${c.env.PLATFORM_DOMAIN}${url.port ? `:${url.port}` : ""}/`,
+      isOwner: role === "owner",
+      active,
+    });
+    return { tenantId, role, nav, media: new Media(c.env.MEDIA, tenantId, c.env.IMAGES), ...forTenant(platform, c.env.DB, tenantId) };
+  }
+
+  const notFound = (c: C) => c.text("Nie znaleziono", 404);
+
+  function bad(c: C, message: string, back = "/") {
+    return c.html(
+      panelPage({
+        title: "Coś się nie zgadza",
+        email: c.get("user").email,
+        notice: notice("err", message),
+        body: html`<a class="btn" href="${back}">← Wróć</a>`,
+      }),
+      400,
+    );
+  }
+
+  /** Stores an uploaded image if the form has one. Returns the new key, undefined when no file was sent. */
+  async function upload(media: Media, file: unknown): Promise<string | undefined> {
+    if (!(file instanceof File) || file.size === 0) return undefined;
+    return media.putImage(await file.arrayBuffer(), file.type);
+  }
+
+  const mediaError = (error: MediaError) =>
+    /larger than 5 MB/.test(error.message)
+      ? "Zdjęcie jest większe niż 5 MB."
+      : "To nie jest obsługiwane zdjęcie. Użyj JPG, PNG, WebP albo AVIF.";
+
+  // Thumbnails for the panel, same membership check as everything else.
+  app.get("/sites/:site/media/*", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const key = decodeURIComponent(c.req.path.split("/media/")[1] ?? "");
+    const object = await site.media.variant(key, 320);
+    if (!object) return notFound(c);
+    const headers = new Headers({ "cache-control": "private, max-age=86400" });
+    object.writeHttpMetadata(headers);
+    return new Response(object.body, { headers });
+  });
+
+  const thumb = (siteId: string, item: Item) =>
+    item.image_key
+      ? html`<img class="thumb" src="/sites/${siteId}/media/${encodeURI(item.image_key)}" alt="" loading="lazy" />`
+      : html`<span class="thumb none" aria-hidden="true">▢</span>`;
+
+  app.get("/sites/:site", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const [items, categories] = await Promise.all([site.catalog.listItems(), site.catalog.listCategories()]);
+    const catName = new Map(categories.map((x) => [x.id, x.name]));
+    return c.html(
+      panelPage({
+        title: "Pozycje",
+        email: c.get("user").email,
+        site: site.nav("items"),
+        notice: savedNotice(c),
+        body: html`<div class="card">
+            <h2>Dodaj pozycję</h2>
+            <form method="post" action="/sites/${site.tenantId}/items" class="inline">
+              <input name="name" placeholder="Nazwa" required maxlength="120" aria-label="Nazwa" />
+              <input name="price" placeholder="Cena, np. 29,99" required inputmode="decimal" aria-label="Cena" />
+              <select name="kind" aria-label="Rodzaj">
+                ${(Object.keys(ITEM_KIND_LABEL) as ItemKind[]).map((k) => html`<option value="${k}">${ITEM_KIND_LABEL[k]}</option>`)}
+              </select>
+              <button class="btn primary">Dodaj</button>
+            </form>
+          </div>
+          ${items.length
+            ? html`<div class="list">
+                ${items.map(
+                  (i) => html`<a href="/sites/${site.tenantId}/items/${i.id}">
+                    ${thumb(site.tenantId, i)}
+                    <div class="grow">
+                      <div class="name">${i.name}</div>
+                      <div class="sub">
+                        ${ITEM_KIND_LABEL[i.kind]}${i.category_id ? html` · ${catName.get(i.category_id) ?? ""}` : ""}
+                        <span class="pill ${i.status}">${STATUS_LABEL[i.status]}</span>
+                      </div>
+                    </div>
+                    <span class="price">${zl(i.price)}</span>
+                  </a>`,
+                )}
+              </div>`
+            : html`<div class="card empty">Brak pozycji. Dodaj pierwszą powyżej.</div>`}`,
+      }),
+    );
+  });
+
+  app.post("/sites/:site/items", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const back = `/sites/${site.tenantId}`;
+    const form = await c.req.parseBody();
+    const price = parsePrice(String(form.price ?? ""));
+    if (price === null) return bad(c, "Niepoprawna cena. Wpisz np. 29,99.", back);
+    try {
+      const item = await site.catalog.createItem({
+        kind: String(form.kind) as ItemKind,
+        name: String(form.name ?? "").slice(0, 120),
+        price,
+      });
+      return c.redirect(`/sites/${site.tenantId}/items/${item.id}`, 303);
+    } catch (error) {
+      if (error instanceof ValidationError) return bad(c, "Sprawdź nazwę i rodzaj pozycji.", back);
+      throw error;
+    }
+  });
+
+  app.get("/sites/:site/items/:item", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const [item, categories] = await Promise.all([site.catalog.getItem(c.req.param("item")), site.catalog.listCategories()]);
+    if (!item) return notFound(c);
+    return c.html(
+      panelPage({
+        title: item.name,
+        email: c.get("user").email,
+        site: site.nav("items"),
+        notice: savedNotice(c),
+        body: html`<form method="post" action="/sites/${site.tenantId}/items/${item.id}" enctype="multipart/form-data">
+            <div class="card">
+              <h2>${ITEM_KIND_LABEL[item.kind]}</h2>
+              <label class="field"><span>Nazwa</span><input name="name" value="${item.name}" required maxlength="120" /></label>
+              <div class="grid two">
+                <label class="field"><span>Cena (zł)</span><input name="price" value="${priceField(item.price)}" required inputmode="decimal" /></label>
+                <label class="field"><span>Status</span>
+                  <select name="status">
+                    ${(Object.keys(STATUS_LABEL) as ItemStatus[]).map(
+                      (s) => html`<option value="${s}" ${s === item.status ? "selected" : ""}>${STATUS_LABEL[s]}</option>`,
+                    )}
+                  </select>
+                  <span class="hint">Ukryta i szkic nie są widoczne na stronie.</span>
+                </label>
+              </div>
+              <label class="field"><span>Kategoria</span>
+                <select name="categoryId">
+                  <option value="">Bez kategorii</option>
+                  ${categories.map((x) => html`<option value="${x.id}" ${x.id === item.category_id ? "selected" : ""}>${x.name}</option>`)}
+                </select>
+              </label>
+              <label class="field"><span>Opis</span><textarea name="description" maxlength="2000">${item.description}</textarea></label>
+              <label class="field"><span>Zdjęcie</span>
+                ${item.image_key ? html`<img class="thumb" src="/sites/${site.tenantId}/media/${encodeURI(item.image_key)}" alt="" />` : ""}
+                <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/avif" />
+                <span class="hint">JPG, PNG, WebP lub AVIF, do 5 MB.${item.image_key ? " Nowy plik zastąpi obecne zdjęcie." : ""}</span>
+              </label>
+              <div class="actions">
+                <a class="btn" href="/sites/${site.tenantId}">Anuluj</a>
+                <button class="btn primary">Zapisz</button>
+              </div>
+            </div>
+          </form>
+          <form method="post" action="/sites/${site.tenantId}/items/${item.id}/delete">
+            <button class="btn danger">Usuń tę pozycję</button>
+          </form>`,
+      }),
+    );
+  });
+
+  app.post("/sites/:site/items/:item", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const current = await site.catalog.getItem(c.req.param("item"));
+    if (!current) return notFound(c);
+    const back = `/sites/${site.tenantId}/items/${current.id}`;
+    const form = await c.req.parseBody();
+    const price = parsePrice(String(form.price ?? ""));
+    if (price === null) return bad(c, "Niepoprawna cena. Wpisz np. 29,99.", back);
+    const categoryId = String(form.categoryId ?? "");
+    let imageKey: string | undefined;
+    try {
+      imageKey = await upload(site.media, form.image);
+      await site.catalog.updateItem(current.id, {
+        name: String(form.name ?? "").slice(0, 120),
+        description: String(form.description ?? "").slice(0, 2000),
+        price,
+        categoryId: categoryId || null,
+        status: String(form.status) as ItemStatus,
+        ...(imageKey ? { imageKey } : {}),
+      });
+      if (imageKey && current.image_key) await site.media.delete(current.image_key);
+    } catch (error) {
+      // Never leave an orphaned upload behind when the rest of the form was rejected.
+      if (imageKey) await site.media.delete(imageKey);
+      if (error instanceof MediaError) return bad(c, mediaError(error), back);
+      if (error instanceof ValidationError) {
+        return bad(c, /category/i.test(error.message) ? "Nieznana kategoria." : "Sprawdź pola formularza.", back);
+      }
+      throw error;
+    }
+    return c.redirect(`${back}?ok=1`, 303);
+  });
+
+  app.post("/sites/:site/items/:item/delete", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const item = await site.catalog.getItem(c.req.param("item"));
+    if (item && (await site.catalog.deleteItem(item.id)) && item.image_key) await site.media.delete(item.image_key);
+    return c.redirect(`/sites/${site.tenantId}`, 303);
+  });
+
+  app.get("/sites/:site/categories", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const [categories, items] = await Promise.all([site.catalog.listCategories(), site.catalog.listItems()]);
+    const count = (id: string) => items.filter((i) => i.category_id === id).length;
+    return c.html(
+      panelPage({
+        title: "Kategorie",
+        email: c.get("user").email,
+        site: site.nav("categories"),
+        notice: savedNotice(c),
+        body: html`<div class="card">
+            <h2>Nowa kategoria</h2>
+            <form method="post" action="/sites/${site.tenantId}/categories" class="inline">
+              <input name="name" placeholder="np. Naprawy, Akcesoria, Desery" required maxlength="80" aria-label="Nazwa kategorii" />
+              <button class="btn primary">Dodaj</button>
+            </form>
+          </div>
+          ${categories.length
+            ? html`<div class="list">
+                ${categories.map(
+                  (x) => html`<div><div class="grow"><div class="name">${x.name}</div></div><span class="sub">${count(x.id)} poz.</span></div>`,
+                )}
+              </div>`
+            : html`<div class="card empty">Kategorie pomagają klientom szybko znaleźć to, czego szukają.</div>`}`,
+      }),
+    );
+  });
+
+  app.post("/sites/:site/categories", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const back = `/sites/${site.tenantId}/categories`;
+    const form = await c.req.parseBody();
+    try {
+      await site.catalog.createCategory({ name: String(form.name ?? "").slice(0, 80) });
+    } catch (error) {
+      if (error instanceof ValidationError) return bad(c, "Podaj nazwę kategorii.", back);
+      if (String(error).includes("UNIQUE")) return bad(c, "Taka kategoria już jest.", back);
+      throw error;
+    }
+    return c.redirect(`${back}?ok=1`, 303);
+  });
+
+  // ---------- Site settings: owners only ----------
+
+  app.get("/sites/:site/settings", async (c) => {
+    const site = await siteFor(c);
+    if (!site || site.role !== "owner") return notFound(c);
+    const s = await site.settings.get();
+    const field = (name: keyof SiteSettings, label: string, type = "text", hint = "") =>
+      html`<label class="field"><span>${label}</span><input type="${type}" name="${name}" value="${String(s[name] ?? "")}" />${hint
+          ? html`<span class="hint">${hint}</span>`
+          : ""}</label>`;
+    return c.html(
+      panelPage({
+        title: "Ustawienia",
+        email: c.get("user").email,
+        site: site.nav("settings"),
+        notice: savedNotice(c),
+        body: html`<form method="post" action="/sites/${site.tenantId}/settings" enctype="multipart/form-data">
+          <div class="card">
+            <h2>O firmie</h2>
+            ${field("tagline", "Krótki opis", "text", "Jedno zdanie pod nazwą, widoczne też w Google.")}
+            <div class="grid two">${field("email", "E-mail kontaktowy", "email")} ${field("phone", "Telefon", "tel")}</div>
+            ${field("address", "Adres")} ${field("hours", "Godziny otwarcia", "text", "np. Pn–Pt 9–17, Sob 10–14")}
+          </div>
+          <div class="card">
+            <h2>Wygląd</h2>
+            <div class="grid two">
+              ${field("accent", "Kolor przewodni", "color")}
+              <label class="field"><span>Szablon</span>
+                <select name="theme">
+                  ${platform.themes.list().map((t) => html`<option value="${t.id}" ${t.id === s.theme ? "selected" : ""}>${t.name}</option>`)}
+                </select>
+              </label>
+            </div>
+            <label class="field"><span>Logo</span>
+              ${s.logoKey ? html`<img class="logo" src="/sites/${site.tenantId}/media/${encodeURI(s.logoKey)}" alt="Obecne logo" />` : ""}
+              <input type="file" name="logo" accept="image/png,image/webp,image/jpeg,image/avif" />
+            </label>
+            <div class="actions"><span></span><button class="btn primary">Zapisz ustawienia</button></div>
+          </div>
+        </form>`,
+      }),
+    );
+  });
+
+  app.post("/sites/:site/settings", async (c) => {
+    const site = await siteFor(c);
+    if (!site || site.role !== "owner") return notFound(c);
+    const back = `/sites/${site.tenantId}/settings`;
+    const form = await c.req.parseBody();
+    const patch: Record<string, unknown> = {};
+    for (const key of ["tagline", "email", "phone", "address", "hours", "accent", "theme"] as const) {
+      if (typeof form[key] === "string") patch[key] = form[key];
+    }
+    const FIELD: Record<string, string> = {
+      email: "E-mail kontaktowy",
+      phone: "Telefon",
+      accent: "Kolor przewodni",
+      theme: "Szablon",
+      tagline: "Krótki opis",
+      address: "Adres",
+      hours: "Godziny otwarcia",
+    };
+    try {
+      cleanSettings(patch); // validate before uploading, so a rejected form leaves no file behind
+      const before = await site.settings.get();
+      const logoKey = await upload(site.media, form.logo);
+      if (logoKey) patch.logoKey = logoKey;
+      await site.settings.update(patch);
+      if (logoKey && before.logoKey) await site.media.delete(before.logoKey);
+    } catch (error) {
+      if (error instanceof MediaError) return bad(c, mediaError(error), back);
+      if (error instanceof ValidationError) {
+        const name = Object.keys(FIELD).find((k) => error.message.startsWith(k));
+        return bad(c, name ? `Popraw pole: ${FIELD[name]}.` : "Sprawdź pola formularza.", back);
+      }
+      throw error;
+    }
+    return c.redirect(`${back}?ok=1`, 303);
+  });
+
+  return app;
+}
