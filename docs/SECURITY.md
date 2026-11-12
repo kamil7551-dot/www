@@ -35,6 +35,13 @@ Opis dla ludzi i agentów. Każda zmiana w `core/auth.ts`, `apps/worker/src/pane
 - Mail do właściciela ma `reply_to` ustawione na nadawcę; treść wiadomości trafia do maila jako zwykły tekst, a w panelu jest escapowana.
 - Wiadomości widzą tylko członkowie strony (`siteFor()`).
 
+## Koszyk i zamówienia
+
+- Każdy POST na stronie sklepu musi mieć `Origin` tej samej domeny, inaczej 403.
+- Koszyk to ciasteczko (`HttpOnly`, `SameSite=Lax`) z samymi id i ilościami. Ceny, dostępność i sumy zawsze liczymy z katalogu; zmiana ciasteczka nic nie daje, a śmieci w nim są pomijane.
+- Klient widzi swoje zamówienie tylko przez link z sekretem z maila. W bazie jest wyłącznie skrót SHA-256 sekretu. Strona zamówienia ma `Referrer-Policy: no-referrer`, `noindex` i `no-store`.
+- Numer konta do przelewu jest sprawdzany sumą kontrolną IBAN przy zapisie, żeby literówka nie kierowała pieniędzy klientów na cudze konto.
+
 ## Testy, które próbują to obejść
 
 `test/auth.test.ts`: ponowne użycie linku, wygasły link, stare linki po logowaniu, wyliczanie kont, limity, sfałszowane i skradzione ciasteczko, CSRF, dostęp do cudzej strony (podgląd, dodanie, usunięcie), zarezerwowane subdomeny, nagłówki.

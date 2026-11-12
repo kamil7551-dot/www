@@ -1,18 +1,24 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { html } from "hono/html";
 import {
   Media,
   cachedTenantResolver,
   forTenant,
+  isSoldOut,
   itemSeoHead,
   robotsTxt,
   seoHead,
   sitemapXml,
+  ValidationError,
+  type Checkout,
+  type Html,
   type Mailer,
   type Platform,
   type Tenant,
 } from "../../../core";
+import { addToCart, cartPage, checkoutPage, orderMails, orderPage } from "../../../themes/shop-pages";
 import { defaultPage, itemDetail } from "../../../themes/shared";
+import { cartCount, changeCart, readCart, writeCart } from "./cart";
 
 type StoreEnv = { Bindings: Env; Variables: { tenant: Tenant } };
 
@@ -24,6 +30,8 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
     const tenant = await resolveTenant(c.env.DB, new URL(c.req.url).host, c.env.PLATFORM_DOMAIN);
     if (!tenant) return c.text("Nie znaleziono strony", 404);
     c.set("tenant", tenant);
+    // A form posted from another website is refused (cart, checkout, contact).
+    if (c.req.method === "POST" && c.req.header("origin") !== new URL(c.req.url).origin) return c.text("Niedozwolone żądanie", 403);
     await next();
   });
 
@@ -99,7 +107,12 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
         tenant,
         settings,
         title: item.name,
-        body: itemDetail({ mediaUrl }, item, html`${after}<p><a class="back" href="/">← Wszystkie produkty</a></p>`),
+        body: itemDetail(
+          { mediaUrl },
+          item,
+          html`${tenant.kind === "shop" && !isSoldOut(item) ? addToCart(item) : ""}${after}<p><a class="back" href="/">← Wszystkie produkty</a></p>`,
+        ),
+        cartCount: tenant.kind === "shop" ? cartCount(readCart(c)) : undefined,
         seo: itemSeoHead({
           tenant,
           item,
@@ -110,6 +123,125 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
         mediaUrl,
       }),
     );
+  });
+
+  // ---------- Shop: cart, checkout, order page (shops only) ----------
+
+  type C = Context<StoreEnv>;
+
+  /** Cart, checkout and order pages: inside the theme's layout, never indexed by search engines. */
+  async function shopPage(c: C, title: string, body: Html, status: 200 | 400 = 200) {
+    const tenant = c.get("tenant");
+    const site = forTenant(platform, c.env.DB, tenant.id);
+    const settings = await site.settings.get();
+    const theme = platform.themes.pick(tenant.kind, settings.theme);
+    c.header("cache-control", "no-store");
+    return c.html(
+      (theme.page ?? defaultPage)({
+        tenant,
+        settings,
+        title,
+        body,
+        seo: html`<title>${title} – ${tenant.name}</title><meta name="robots" content="noindex" />`,
+        slot: (name, data) => site.slot(name, data, { tenant, settings }),
+        mediaUrl,
+        cartCount: cartCount(readCart(c)),
+      }),
+      status,
+    );
+  }
+
+  app.use("/cart/*", async (c, next) => (c.get("tenant").kind === "shop" ? next() : c.notFound()));
+  app.use("/cart", async (c, next) => (c.get("tenant").kind === "shop" ? next() : c.notFound()));
+  app.use("/checkout", async (c, next) => (c.get("tenant").kind === "shop" ? next() : c.notFound()));
+  app.use("/order/*", async (c, next) => (c.get("tenant").kind === "shop" ? next() : c.notFound()));
+
+  const qtyOf = (v: unknown) => {
+    const n = Number(v);
+    return Number.isInteger(n) && n >= 0 ? n : 1;
+  };
+
+  app.post("/cart/add", async (c) => {
+    const form = await c.req.parseBody();
+    const itemId = String(form.itemId ?? "");
+    const site = forTenant(platform, c.env.DB, c.get("tenant").id);
+    const item = await site.catalog.getItem(itemId);
+    if (!item || item.status !== "active" || isSoldOut(item)) return c.redirect("/cart?n=gone", 303);
+    writeCart(c, changeCart(readCart(c), item.id, Math.max(1, qtyOf(form.qty)), true));
+    return c.redirect("/cart?n=added", 303);
+  });
+
+  app.post("/cart/update", async (c) => {
+    const form = await c.req.parseBody();
+    const qty = form.op === "remove" ? 0 : qtyOf(form.qty);
+    writeCart(c, changeCart(readCart(c), String(form.itemId ?? ""), qty));
+    return c.redirect("/cart", 303);
+  });
+
+  app.get("/cart", async (c) => {
+    const site = forTenant(platform, c.env.DB, c.get("tenant").id);
+    const cart = readCart(c);
+    const [priced, settings] = await Promise.all([site.orders.price(cart), site.settings.get()]);
+    // Keep the cookie in line with what can still be bought.
+    if (priced.dropped) writeCart(c, priced.lines.map((l) => ({ itemId: l.item.id, qty: l.qty })));
+    const notice = { added: "Dodano do koszyka.", gone: "Tego produktu nie można już kupić." }[c.req.query("n") ?? ""] ?? "";
+    return shopPage(c, "Koszyk", cartPage({ mediaUrl }, priced, settings, notice));
+  });
+
+  app.get("/checkout", async (c) => {
+    const site = forTenant(platform, c.env.DB, c.get("tenant").id);
+    const [priced, settings] = await Promise.all([site.orders.price(readCart(c)), site.settings.get()]);
+    if (!priced.lines.length) return c.redirect("/cart", 303);
+    return shopPage(c, "Zamówienie", checkoutPage(priced, settings));
+  });
+
+  app.post("/checkout", async (c) => {
+    const tenant = c.get("tenant");
+    const site = forTenant(platform, c.env.DB, tenant.id);
+    const form = await c.req.parseBody();
+    const field = (name: string) => (typeof form[name] === "string" ? (form[name] as string) : "");
+    const input: Checkout = {
+      name: field("name"),
+      email: field("email"),
+      phone: field("phone"),
+      delivery: field("delivery") as Checkout["delivery"],
+      address: field("address"),
+      note: field("note"),
+    };
+    const cart = readCart(c);
+    const settings = await site.settings.get();
+    let placed;
+    try {
+      placed = await site.orders.place(cart, input, settings);
+    } catch (error) {
+      if (!(error instanceof ValidationError)) throw error;
+      if (error.message === "cart") return c.redirect("/cart", 303);
+      return shopPage(c, "Zamówienie", checkoutPage(await site.orders.price(cart), settings, input, error.message), 400);
+    }
+    const { order, key } = placed;
+    writeCart(c, []);
+    const url = new URL(c.req.url);
+    const orderUrl = `${url.origin}/order/${order.id}?k=${key}`;
+    const panelUrl = `${url.protocol}//panel.${c.env.PLATFORM_DOMAIN}${url.port ? `:${url.port}` : ""}/sites/${tenant.id}/orders/${order.id}`;
+    const mails = orderMails(order, settings, tenant.name, orderUrl, panelUrl);
+    const send = mailer(c.env);
+    // The order is saved; a mail provider hiccup must not turn it into an error page.
+    c.executionCtx.waitUntil(
+      Promise.all([send.send(mails.customer), mails.seller && send.send(mails.seller)]).catch((err: unknown) => console.error("order mail failed", err)),
+    );
+    return c.redirect(`/order/${order.id}?k=${key}&new=1`, 303);
+  });
+
+  app.get("/order/:id", async (c) => {
+    const site = forTenant(platform, c.env.DB, c.get("tenant").id);
+    const [order, settings] = await Promise.all([
+      site.orders.getForCustomer(c.req.param("id"), c.req.query("k") ?? ""),
+      site.settings.get(),
+    ]);
+    if (!order) return c.text("Nie znaleziono zamówienia", 404);
+    // The secret is in the address: never send it to other sites as a referrer.
+    c.header("referrer-policy", "no-referrer");
+    return shopPage(c, `Zamówienie nr ${order.number}`, orderPage(order, settings, c.req.query("new") === "1"));
   });
 
   app.get("/", async (c) => {
@@ -130,6 +262,7 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
         categories,
         slot: (name, data) => site.slot(name, data, { tenant, settings }),
         mediaUrl,
+        cartCount: tenant.kind === "shop" ? cartCount(readCart(c)) : undefined,
         flash: c.req.query("sent") ? "sent" : c.req.query("contact") === "error" ? "contact-error" : undefined,
         seo: seoHead({
           tenant,

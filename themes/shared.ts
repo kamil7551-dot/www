@@ -74,7 +74,30 @@ export const SHARED_CSS = `
 .product-price{font-size:1.4rem;font-weight:700;margin:0 0 1rem;color:var(--accent)}
 .product-desc{white-space:pre-line;margin:0 0 .8rem}
 .soldout{font-size:.9rem;font-weight:700;color:#a3271a;background:#fdecea;border-radius:999px;padding:.2rem .7rem}
-.back{display:inline-block;margin:0 0 1rem}`;
+.back{display:inline-block;margin:0 0 1rem}
+.muted{color:#5d6370}.flash{padding:.75rem 1rem;border-radius:10px;background:#eef3ff;font-weight:600}
+.flash.ok{background:#e6f6ec;color:#11683a}.flash.err{background:#fdecea;color:#a3271a}
+.buy{display:flex;gap:.6rem;align-items:end;flex-wrap:wrap;margin:1rem 0}.buy label{display:grid;gap:.2rem;font-size:.85rem;color:#5d6370}
+.buy input{width:5rem}
+.buy-btn{display:inline-block;text-align:center;font:inherit;font-weight:700;padding:.85rem 1.4rem;border-radius:10px;border:0;
+background:var(--accent);color:#fff;cursor:pointer;text-decoration:none}.buy-btn:hover{filter:brightness(1.07)}
+input,textarea{font:inherit;padding:.6rem .7rem;border:1px solid #d7dae0;border-radius:8px;background:#fff;color:inherit;width:100%}
+input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.lines{list-style:none;margin:0 0 1.5rem;padding:0;border-top:1px solid #e7e9ee}
+.lines li{display:grid;grid-template-columns:4rem 1fr auto;gap:.4rem 1rem;align-items:center;padding:.9rem 0;border-bottom:1px solid #e7e9ee}
+.lines img,.lines .nopic{width:4rem;height:4rem;border-radius:8px;object-fit:cover;background:#f6f7f9;grid-row:span 2}
+.line-main{display:grid}.line-main a{color:inherit;font-weight:600}.line-total{text-align:right}
+.qty{display:flex;gap:.5rem;align-items:center;grid-column:2/4}.qty input{width:4.5rem;padding:.35rem .5rem}
+.link{background:none;border:0;padding:0;font:inherit;color:var(--accent);cursor:pointer;text-decoration:underline}.link.danger{color:#a3271a}
+.summary{display:grid;gap:.5rem;max-width:26rem;margin-left:auto}.summary p{display:flex;justify-content:space-between;gap:1rem;margin:0}
+.summary .buy-btn{margin-top:.5rem}.summary .back{text-align:center}
+.checkout{display:grid;gap:1.5rem}@media(min-width:56rem){.checkout{grid-template-columns:1.3fr 1fr;align-items:start}.checkout .summary{grid-column:2;grid-row:1/3}}
+.checkout fieldset{border:0;padding:0;margin:0;display:grid;gap:.85rem}.checkout legend{font-weight:700;font-size:1.1rem;margin-bottom:.5rem}
+.checkout label{display:grid;gap:.3rem;font-weight:600;font-size:.92rem}
+.choice{grid-template-columns:auto 1fr!important;align-items:start;border:1px solid #d7dae0;border-radius:10px;padding:.8rem;font-weight:400!important}
+.choice input{width:auto;margin:.3rem .3rem 0 0}.choice:has(input:checked){border-color:var(--accent);background:#f6f8ff}
+.pay{border:2px solid var(--accent);border-radius:12px;padding:1rem 1.2rem;margin:1rem 0;max-width:34rem}
+.pay h2{margin:0 0 .6rem;font-size:1.1rem}.pay p{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin:.3rem 0}`;
 
 /** Plain layout for pages of themes that do not define their own. */
 export const defaultPage = async (v: PageView) => html`<!doctype html>
