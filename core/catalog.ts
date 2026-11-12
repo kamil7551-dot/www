@@ -1,3 +1,4 @@
+import { cleanAllergens, endOfDayInPoland } from "./allergens";
 import { newId, type TenantDb } from "./db";
 import type { CoreEvents, EventName } from "./events";
 import { slugify } from "./slug";
@@ -18,6 +19,10 @@ export interface Item {
   status: ItemStatus;
   image_key: string | null;
   position: number;
+  /** Comma-separated allergen ids; read with parseAllergens(). */
+  allergens: string;
+  /** Unix time until which the item is sold out ("brak dziś"); null = available. */
+  sold_out_until: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -41,6 +46,7 @@ export interface NewItem {
   status?: ItemStatus;
   imageKey?: string | null;
   position?: number;
+  allergens?: string[];
 }
 
 export type ItemPatch = Partial<Omit<NewItem, "kind">>;
@@ -49,10 +55,13 @@ type Emit = <E extends EventName>(event: E, payload: CoreEvents[E]) => Promise<v
 
 export class ValidationError extends Error {}
 
+export const isSoldOut = (item: Pick<Item, "sold_out_until">, at = Math.floor(Date.now() / 1000)) =>
+  item.sold_out_until !== null && item.sold_out_until > at;
+
 const KINDS: ItemKind[] = ["product", "service", "dish"];
 const STATUSES: ItemStatus[] = ["active", "hidden", "draft"];
 const ITEM_COLUMNS =
-  "id, kind, name, slug, description, price, currency, category_id, status, image_key, position, created_at, updated_at";
+  "id, kind, name, slug, description, price, currency, category_id, status, image_key, position, allergens, sold_out_until, created_at, updated_at";
 
 function check(input: ItemPatch & { kind?: ItemKind }): void {
   if (input.kind !== undefined && !KINDS.includes(input.kind)) throw new ValidationError(`Unknown kind: ${input.kind}`);
@@ -86,8 +95,8 @@ export class Catalog {
     const id = newId();
     const slug = slugify(input.slug ?? input.name) || id;
     await this.db.run(
-      `INSERT INTO items (tenant_id, id, kind, name, slug, description, price, currency, category_id, status, image_key, position)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+      `INSERT INTO items (tenant_id, id, kind, name, slug, description, price, currency, category_id, status, image_key, position, allergens)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
       id,
       input.kind,
       input.name.trim(),
@@ -99,6 +108,7 @@ export class Catalog {
       input.status ?? "active",
       input.imageKey ?? null,
       input.position ?? 0,
+      cleanAllergens(input.allergens ?? []).join(","),
     );
     const item = (await this.getItem(id))!;
     await this.emit("item.created", { item });
@@ -130,7 +140,7 @@ export class Catalog {
     await this.checkCategory(patch.categoryId);
     await this.db.run(
       `UPDATE items SET name = ?3, slug = ?4, description = ?5, price = ?6, currency = ?7, category_id = ?8,
-         status = ?9, image_key = ?10, position = ?11, updated_at = unixepoch()
+         status = ?9, image_key = ?10, position = ?11, allergens = ?12, updated_at = unixepoch()
        WHERE tenant_id = ?1 AND id = ?2`,
       id,
       patch.name?.trim() ?? current.name,
@@ -142,7 +152,21 @@ export class Catalog {
       patch.status ?? current.status,
       patch.imageKey !== undefined ? patch.imageKey : current.image_key,
       patch.position ?? current.position,
+      patch.allergens !== undefined ? cleanAllergens(patch.allergens).join(",") : current.allergens,
     );
+    const item = (await this.getItem(id))!;
+    await this.emit("item.updated", { item });
+    return item;
+  }
+
+  /** "Brak dziś": sold out until the end of today in Poland, then available again by itself. */
+  async setSoldOut(id: string, soldOut: boolean, at = Math.floor(Date.now() / 1000)): Promise<Item | null> {
+    const changed = await this.db.run(
+      `UPDATE items SET sold_out_until = ?3, updated_at = unixepoch() WHERE tenant_id = ?1 AND id = ?2`,
+      id,
+      soldOut ? endOfDayInPoland(at) : null,
+    );
+    if (!changed) return null;
     const item = (await this.getItem(id))!;
     await this.emit("item.updated", { item });
     return item;

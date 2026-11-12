@@ -27,7 +27,8 @@ export function forTenant(platform: Platform, d1: D1Database, tenantId: string) 
   return { db, catalog: new Catalog(db, emit), settings: new Settings(db), inbox: new Inbox(db), enabledModules, slot };
 }
 
-export { Catalog, ValidationError } from "./catalog";
+export { Catalog, ValidationError, isSoldOut } from "./catalog";
+export { ALLERGENS, allergenNumber, cleanAllergens, endOfDayInPoland, parseAllergens, type AllergenId } from "./allergens";
 export type { Category, Item, ItemKind, ItemStatus, NewItem } from "./catalog";
 export { TenantDb, newId } from "./db";
 export { EventBus } from "./events";
