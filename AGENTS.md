@@ -19,10 +19,10 @@ Plan prac: [ROADMAP.md](ROADMAP.md). Sposób współpracy: [INSTRUCTIONS.md](INS
 | Kto | Rola |
 | --- | --- |
 | Kamil (właściciel) | Decyzje produktowe, priorytety, zgoda na wdrożenie do Cloudflare |
-| Claude | Architekt i strażnik rdzenia: projektuje rdzeń, pisze zadania, przegląda i merguje PR-y |
+| Claude | Główny inżynier, architekt i strażnik rdzenia: projektuje rdzeń, pisze zadania, przegląda i merguje PR-y |
 | Cursor i inni agenci | Implementują moduły, szablony i poprawki w małych, atomowych PR-ach |
 
-Agent wykonujący nie merguje własnych PR-ów. Nikt nie wdraża na Cloudflare bez wyraźnej zgody Kamila.
+Agent wykonujący nie merguje własnych PR-ów. Wyjątek: Claude jako główny inżynier merguje PR-y samodzielnie, także własne, gdy testy przechodzą (decyzja Kamila z 2026-11-06). O postępach i zmianach informuje Kamila, a o lepszych rozwiązaniach pyta. Nikt nie wdraża na Cloudflare bez wyraźnej zgody Kamila.
 
 ## Stos technologiczny
 
@@ -106,6 +106,19 @@ PR, który przekracza budżet, nie zostanie zmergowany bez zgody Kamila.
 - Zmiany w `core/`, `migrations/` i `AGENTS.md` wymagają przeglądu Claude jako architekta. W opisie PR zaznacz, że dotyka rdzenia.
 - Żadnych sekretów w repozytorium. Klucze API tylko przez `wrangler secret`.
 - Nie zmieniaj nazw ani znaczenia istniejących zdarzeń, kolumn i id modułów; dodawaj nowe obok.
+
+## Zapisywanie pracy
+
+Żeby każdy agent wiedział, co robią inni i co już zrobiono, używamy dwóch tabel na górze [ROADMAP.md](ROADMAP.md).
+
+1. **Przed startem** sprawdź tabelę „W toku”. Jeśli zadanie jest wolne, dopisz wiersz (zadanie, agent, gałąź, data) w pierwszym commicie swojej gałęzi. Nazwa agenta: `Claude`, `Cursor` albo inna stała nazwa.
+2. **W PR kończącym zadanie**:
+   - usuń swój wiersz z „W toku”,
+   - dopisz wiersz na górze „Dziennika prac” z datą, nazwą agenta, jednym zdaniem o tym, co zrobiono, nazwą gałęzi lub numerem PR i notatką „Dla następnych”,
+   - odhacz zadanie w odpowiednim etapie (`- [x]`).
+3. **Zadanie przerwane lub porzucone**: usuń wiersz z „W toku” i zapisz w dzienniku, na czym skończyłeś.
+4. Notatka „Dla następnych” jest krótka i konkretna: co zostało do zrobienia, jakie decyzje podjęto, na co uważać. Bez opisywania kodu, który widać w PR.
+5. Konflikt w ROADMAP.md przy merge'u rozwiązuj, zachowując wiersze obu stron.
 
 ## Opis PR
 
