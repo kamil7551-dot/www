@@ -57,6 +57,8 @@ padding:.6rem 1rem;min-height:2.6rem;border:1px solid var(--line);background:var
 .note{border-radius:8px;padding:.7rem .9rem;margin-bottom:1rem;font-weight:500}
 .note.ok{background:var(--ok-soft);color:var(--ok)}.note.err{background:var(--danger-soft);color:var(--danger)}
 .empty{text-align:center;color:var(--muted);padding:2rem 1rem}
+.count{display:inline-block;min-width:1.25rem;padding:0 .35rem;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.75rem;text-align:center}
+.msg{display:block!important}.msg.new{background:var(--accent-soft)}.msg p{margin:.5rem 0 .25rem;white-space:pre-wrap;overflow-wrap:anywhere}
 .auth{min-height:100vh;display:grid;place-items:center;padding:1rem}
 .auth .card{width:100%;max-width:24rem;padding:1.75rem}
 .auth h1{margin-bottom:.5rem}.auth p{color:var(--muted);margin:0 0 1.25rem}
@@ -70,7 +72,7 @@ padding:.6rem 1rem;min-height:2.6rem;border:1px solid var(--line);background:var
 `;
 
 /** Bump when PANEL_CSS changes, so browsers fetch the new file. */
-export const PANEL_CSS_VERSION = "3";
+export const PANEL_CSS_VERSION = "4";
 
 const head = (title: string) => html`<meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -95,13 +97,15 @@ export interface SiteNav {
   name: string;
   publicUrl: string;
   isOwner: boolean;
-  active: "items" | "categories" | "settings";
+  active: "items" | "categories" | "messages" | "settings";
+  /** Unread contact form messages, shown as a badge on the tab. */
+  unread: number;
 }
 
 /** Signed-in layout: top bar, optional site tabs, content. */
 export function panelPage(opts: { title: string; email: string; site?: SiteNav; notice?: Html; body: Html }) {
   const s = opts.site;
-  const tab = (key: SiteNav["active"], href: string, label: string) =>
+  const tab = (key: SiteNav["active"], href: string, label: string | Html) =>
     html`<a href="${href}" ${s?.active === key ? raw('aria-current="page"') : ""}>${label}</a>`;
   return html`<!doctype html>
     <html lang="pl">
@@ -125,6 +129,7 @@ export function panelPage(opts: { title: string; email: string; site?: SiteNav; 
                 </div>
                 <nav class="tabs">
                   ${tab("items", `/sites/${s.id}`, "Pozycje")} ${tab("categories", `/sites/${s.id}/categories`, "Kategorie")}
+                  ${tab("messages", `/sites/${s.id}/messages`, html`Wiadomości${s.unread ? html` <span class="count">${s.unread}</span>` : ""}`)}
                   ${s.isOwner ? tab("settings", `/sites/${s.id}/settings`, "Ustawienia") : ""}
                 </nav>`
             : ""}

@@ -27,6 +27,14 @@ Opis dla ludzi i agentów. Każda zmiana w `core/auth.ts`, `apps/worker/src/pane
 - Dostęp do strony klienta zawsze przez `membership(user, tenant)`. Cudza strona zwraca 404, a nie 403, żeby nie zdradzać, że istnieje.
 - Subdomeny zarezerwowane dla platformy (`panel`, `www`, `api`, `admin` i inne w `RESERVED_SLUGS`) nigdy nie trafią do klienta.
 
+## Formularz kontaktowy na stronie sklepu
+
+- Przyjmujemy tylko POST z tej samej domeny (`Origin`), inaczej 403.
+- Ukryte pole `website` to pułapka na boty: wypełnione = udajemy sukces, nic nie zapisujemy ani nie wysyłamy.
+- Limity: 5 wiadomości na godzinę z jednego IP (trzymamy tylko skrót IP) i 100 na dobę na stronę.
+- Mail do właściciela ma `reply_to` ustawione na nadawcę; treść wiadomości trafia do maila jako zwykły tekst, a w panelu jest escapowana.
+- Wiadomości widzą tylko członkowie strony (`siteFor()`).
+
 ## Testy, które próbują to obejść
 
 `test/auth.test.ts`: ponowne użycie linku, wygasły link, stare linki po logowaniu, wyliczanie kont, limity, sfałszowane i skradzione ciasteczko, CSRF, dostęp do cudzej strony (podgląd, dodanie, usunięcie), zarezerwowane subdomeny, nagłówki.

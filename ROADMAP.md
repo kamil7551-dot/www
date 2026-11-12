@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-12 | Claude | Wizytówka: szablon `business-card` (O nas, oferta, kontakt z mapą i godzinami), formularz kontaktowy z mailem do właściciela, zakładka „Wiadomości” w panelu, pole „O nas” w ustawieniach | PR `feat/business-card` | Formularz: ukryte pole `website` łapie boty (dostają „wysłano”, nic nie zapisujemy), limit 5/h na IP i 100/dobę na stronę, POST z obcej domeny = 403. Mail idzie przez `waitUntil`, więc błąd poczty nie psuje wysyłki formularza; wiadomość i tak jest w panelu. Mapa to link do Google Maps, bez osadzania (zero JS) |
 | 2026-11-12 | Claude | SEO dla każdej strony: tytuł, opis, canonical, Open Graph, dane schema.org (`core/seo.ts`), `robots.txt`, `sitemap.xml` | PR `feat/storefront-seo` | Szablony nie budują SEO same: wstawiają gotowe `v.seo` w `<head>`. JSON-LD przez `safeJson`, żeby `</script>` w danych sprzedawcy nie zamknął tagu. Test budżetu dopuszcza tylko `<script type="application/ld+json">` |
 | 2026-11-08 | Claude | Nowy wygląd panelu: arkusz `/assets/panel.css` (bez JS, tryb ciemny, telefon), ekrany logowania, stron, pozycji z miniaturami, edycji, kategorii i ustawień | PR `feat/core-catalog` | CSP panelu nie pozwala już na style inline: style tylko w `PANEL_CSS` (`panel-ui.ts`), po zmianie podbij `PANEL_CSS_VERSION`. Referrer-Policy zmieniona na `same-origin`, bo przy `no-referrer` przeglądarki wysyłały `Origin: null` i blokowały logowanie (testy tego nie łapały, wyszło na zrzutach z prawdziwej przeglądarki). Zrzuty: /mnt/project-files/panel-screens/ |
 | 2026-11-08 | Claude | Miniatury zdjęć przez binding Images (`Media.variant`), weryfikacja bajtów obrazu przy uploadzie, cache rozpoznawania sklepu (`cachedTenantResolver`), test budżetu wydajności strony głównej | PR `feat/core-catalog` | Binding `IMAGES` działa lokalnie (miniflare + sharp). Testy uploadu muszą używać prawdziwego obrazu: `test/fixtures.ts`. Zmiana domeny lub sluga sklepu jest widoczna po max 60 s. Test budżetu w `test/storefront.test.ts` pilnuje braku JS i < 100 KB gzip |
@@ -66,10 +67,10 @@ Cel: jeden silnik, na którym stoją wszystkie rodzaje stron.
 
 Cel: pierwszy produkt do sprzedaży, bez płatności i kurierów.
 
-- [ ] Szablon `business-card`: strona główna, oferta, kontakt, mapa, godziny otwarcia
-- [ ] Formularz kontaktowy z wysyłką maila
+- [x] Szablon `business-card`: strona główna, oferta, kontakt, mapa, godziny otwarcia
+- [x] Formularz kontaktowy z wysyłką maila i skrzynką wiadomości w panelu
 - [x] Podstawowe SEO: tytuły, opisy, mapa strony, dane strukturalne firmy
-- [ ] Wybór kolorów, logo i tekstów w panelu
+- [x] Wybór kolorów, logo i tekstów w panelu (także „O nas”)
 - [ ] Test z pierwszym klientem
 
 ## Etap 3: Menu QR

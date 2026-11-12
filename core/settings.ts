@@ -5,6 +5,8 @@ import { normalizeEmail } from "./auth";
 /** Everything a seller can set about how the site looks and how to reach them. */
 export interface SiteSettings {
   tagline: string;
+  /** Longer "about us" text; blank lines split paragraphs. */
+  about: string;
   email: string;
   phone: string;
   address: string;
@@ -19,6 +21,7 @@ export interface SiteSettings {
 
 export const DEFAULT_SETTINGS: SiteSettings = {
   tagline: "",
+  about: "",
   email: "",
   phone: "",
   address: "",
@@ -28,7 +31,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   theme: "",
 };
 
-const LIMITS: Partial<Record<keyof SiteSettings, number>> = { tagline: 160, address: 200, hours: 200, phone: 30, theme: 40 };
+const LIMITS: Partial<Record<keyof SiteSettings, number>> = { tagline: 160, about: 3000, address: 200, hours: 200, phone: 30, theme: 40 };
 
 /** Validates a partial update and returns the cleaned values. Throws ValidationError with a field name. */
 export function cleanSettings(patch: Partial<Record<keyof SiteSettings, unknown>>): Partial<SiteSettings> {
