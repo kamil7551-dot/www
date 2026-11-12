@@ -63,7 +63,7 @@ describe("shop theme", () => {
     const cat = await s.catalog.createCategory({ name: "Kable" });
     await s.catalog.createItem({ kind: "product", name: "Kabel HDMI", price: 3900, categoryId: cat.id });
     const { body } = await get("siatka", "/");
-    expect(body).toContain('class="grid"');
+    expect(body).toContain('class="pgrid"');
     expect(body).toContain('href="/p/kabel-hdmi"');
     expect(body).not.toMatch(/<script(?! type="application\/ld\+json")/);
   });

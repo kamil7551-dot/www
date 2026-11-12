@@ -69,6 +69,26 @@ export const itemDetail = (v: Pick<HomeView, "mediaUrl">, item: Item, after: unk
 
 /** CSS for the shared components above; themes include it in their own <style>. */
 export const SHARED_CSS = `
+.pgrid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr))}
+@media(min-width:48rem){.pgrid{grid-template-columns:repeat(auto-fill,minmax(14rem,1fr));gap:1.25rem}}
+.pcard{display:flex;flex-direction:column;color:inherit;text-decoration:none;border-radius:12px;overflow:hidden;border:1px solid #e7e9ee;background:#fff}
+.pcard:hover{border-color:var(--accent)}.pcard .pic{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#f6f7f9}
+.pcard .nopic{aspect-ratio:1;background:#f6f7f9}.pcard .body{padding:.7rem .85rem .9rem;display:flex;flex-direction:column;gap:.2rem}
+.pcard .name{font-weight:600;line-height:1.3}.pcard .price{font-weight:700}.pcard.out{opacity:.6}.pcard .tag{font-size:.75rem;color:#a3271a;font-weight:700}
+.chips{display:flex;gap:.4rem;overflow-x:auto;padding:.75rem 0;scrollbar-width:none}
+.chips a{flex:none;padding:.35rem .85rem;border-radius:999px;border:1px solid #e7e9ee;color:inherit;text-decoration:none;font-size:.95rem;background:#fff}
+.chips a:hover{border-color:var(--accent)}
+.search{display:flex;min-width:0;flex:1;max-width:24rem}.search input{flex:1;min-width:0;font:inherit;padding:.45rem .7rem;border:1px solid #d7dae0;border-radius:10px 0 0 10px}
+.search button{font:inherit;font-weight:600;border:0;background:var(--accent);color:#fff;padding:0 .9rem;border-radius:0 10px 10px 0;cursor:pointer}
+.listing h1{margin:0 0 .25rem;font-size:clamp(1.4rem,4vw,1.9rem)}
+.filters{display:grid;gap:.6rem;grid-template-columns:1fr 1fr;align-items:end;margin:.75rem 0;padding:.9rem;border:1px solid #e7e9ee;border-radius:12px;background:#f6f7f9}
+.filters label{display:grid;gap:.2rem;font-size:.85rem;font-weight:600}.filters .f-q{grid-column:1/-1}
+.filters input,.filters select{font:inherit;font-weight:400;padding:.5rem .6rem;border:1px solid #d7dae0;border-radius:8px;width:100%;background:#fff}
+.filters button{font:inherit;font-weight:700;border:0;border-radius:8px;background:var(--accent);color:#fff;padding:.55rem 1rem;cursor:pointer}
+@media(min-width:48rem){.filters{grid-template-columns:2fr 1fr 1fr 1.4fr auto}.filters .f-q{grid-column:auto}}
+.count{color:#5d6370;margin:.25rem 0 1rem;font-size:.95rem}.empty{padding:2rem 0}
+.pages{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin:1.5rem 0 0}
+.more{display:inline-block;margin:.9rem 0 0;font-weight:600}
 .product{display:grid;gap:1.5rem;align-items:start}@media(min-width:48rem){.product{grid-template-columns:1fr 1fr}}
 .product-pic{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;display:block}
 .product h1{margin:0 0 .4rem;font-size:clamp(1.5rem,4vw,2.1rem);line-height:1.15}

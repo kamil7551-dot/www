@@ -9,6 +9,10 @@ import {
   robotsTxt,
   seoHead,
   sitemapXml,
+  browse,
+  categoryAndChildren,
+  parseBrowse,
+  type Category,
   ValidationError,
   type Checkout,
   type Html,
@@ -18,6 +22,7 @@ import {
 } from "../../../core";
 import { privacyPage, termsPage, withdrawalPage } from "../../../themes/legal";
 import { addToCart, cartPage, checkoutPage, orderMails, orderPage } from "../../../themes/shop-pages";
+import { categoryHref, listingPage } from "../../../themes/listing";
 import { defaultPage, itemDetail } from "../../../themes/shared";
 import { cartCount, changeCart, readCart, writeCart } from "./cart";
 
@@ -56,7 +61,12 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
     const origin = new URL(c.req.url).origin;
     // Item pages are linked from the shop theme only, so only shops list them.
     const itemPages = tenant.kind === "shop" ? items.map((i) => ({ url: `${origin}/p/${encodeURIComponent(i.slug)}`, lastModified: i.updated_at })) : [];
-    return c.body(sitemapXml([{ url: `${origin}/`, lastModified }, ...itemPages]), 200, {
+    const categories = tenant.kind === "shop" ? await forTenant(platform, c.env.DB, tenant.id).catalog.listCategories() : [];
+    const used = new Set(items.map((i) => i.category_id));
+    const categoryPages = categories
+      .filter((k) => [...categoryAndChildren(categories, k.id)].some((id) => used.has(id)))
+      .map((k) => ({ url: `${origin}${categoryHref(k)}`, lastModified }));
+    return c.body(sitemapXml([{ url: `${origin}/`, lastModified }, ...categoryPages, ...itemPages]), 200, {
       "content-type": "application/xml; charset=utf-8",
     });
   });
@@ -125,6 +135,59 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
       }),
     );
   });
+
+  // ---------- Shop: product search and category pages (shops only) ----------
+
+  app.use("/produkty", async (c, next) => (c.get("tenant").kind === "shop" ? next() : c.notFound()));
+  app.use("/kategoria/*", async (c, next) => (c.get("tenant").kind === "shop" ? next() : c.notFound()));
+
+  async function listing(c: C, slug?: string) {
+    const tenant = c.get("tenant");
+    const site = forTenant(platform, c.env.DB, tenant.id);
+    const [settings, items, categories] = await Promise.all([
+      site.settings.get(),
+      site.catalog.listItems({ status: "active" }),
+      site.catalog.listCategories(),
+    ]);
+    const category = slug === undefined ? undefined : categories.find((k) => k.slug === slug);
+    if (slug !== undefined && !category) return c.text("Nie znaleziono", 404);
+    const url = new URL(c.req.url);
+    const query = parseBrowse(url.searchParams);
+    const result = browse(items, categories, query, category?.id);
+    const base = category ? categoryHref(category) : "/produkty";
+    const used = new Set(items.map((i) => i.category_id));
+    const hasItems = (k: Category) => [...categoryAndChildren(categories, k.id)].some((id) => used.has(id));
+    const chips = categories.filter((k) => k.parent_id === (category?.id ?? null) && hasItems(k));
+    const parent = category?.parent_id ? categories.find((k) => k.id === category.parent_id) : undefined;
+    const heading = category ? category.name : query.q ? `Wyniki dla „${query.q}”` : "Wszystkie produkty";
+    // A category page is worth finding in Google; search results and filtered views are not.
+    const plain = category && !query.q && query.min === null && query.max === null && query.sort === "polecane" && result.page === 1;
+    const theme = platform.themes.pick(tenant.kind, settings.theme);
+    return c.html(
+      (theme.page ?? defaultPage)({
+        tenant,
+        settings,
+        title: heading,
+        body: listingPage({
+          mediaUrl,
+          result,
+          base,
+          heading,
+          chips,
+          up: parent ? { href: categoryHref(parent), label: parent.name } : { href: "/", label: "Strona główna" },
+        }),
+        cartCount: cartCount(readCart(c)),
+        seo: plain
+          ? html`<title>${category.name} – ${tenant.name}</title><link rel="canonical" href="${url.origin}${base}" />`
+          : html`<title>${heading} – ${tenant.name}</title><meta name="robots" content="noindex" />`,
+        slot: (name, data) => site.slot(name, data, { tenant, settings }),
+        mediaUrl,
+      }),
+    );
+  }
+
+  app.get("/produkty", (c) => listing(c));
+  app.get("/kategoria/:slug", (c) => listing(c, c.req.param("slug")));
 
   // ---------- Shop: cart, checkout, order page (shops only) ----------
 
