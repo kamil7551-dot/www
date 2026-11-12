@@ -19,6 +19,8 @@ export interface HomeView {
   seo: HtmlEscapedString | Promise<HtmlEscapedString>;
   /** Public URL of a media key (logo, item image); with a width, a resized WebP copy. */
   mediaUrl: (key: string, width?: number) => string;
+  /** Shops only: number of pieces in the visitor's cart, for a cart link in the header. */
+  cartCount?: number;
 }
 
 /** Any page other than the home page (item, cart, checkout…). The platform renders the content; the theme wraps it. */
@@ -32,6 +34,7 @@ export interface PageView {
   seo: HtmlEscapedString | Promise<HtmlEscapedString>;
   slot: HomeView["slot"];
   mediaUrl: HomeView["mediaUrl"];
+  cartCount?: number;
 }
 
 export interface ThemeDefinition {

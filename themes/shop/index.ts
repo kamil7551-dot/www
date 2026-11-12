@@ -24,6 +24,8 @@ h2{font-size:1.25rem;margin:1.5rem 0 .75rem}
 .card .name{font-weight:600;line-height:1.3}.card .price{font-weight:700}
 .card.out{opacity:.6}.card .tag{font-size:.75rem;color:#a3271a;font-weight:700}
 main{padding-bottom:2.5rem}
+.cart-link{color:var(--ink);text-decoration:none;font-weight:600;display:flex;align-items:center;gap:.35rem}
+.cart-link .count{background:var(--accent);color:#fff;border-radius:999px;min-width:1.4rem;padding:0 .4rem;text-align:center;font-size:.8rem}
 footer{border-top:1px solid var(--line);background:var(--soft);padding:1.5rem 0;color:var(--muted);font-size:.95rem}
 footer p{margin:.2rem 0}
 ${SHARED_CSS}`;
@@ -31,6 +33,9 @@ ${SHARED_CSS}`;
 const header = (v: HomeView | PageView) => html`<header class="top"><div class="wrap">
   <a class="brand" href="/">${v.settings.logoKey ? html`<img src="${v.mediaUrl(v.settings.logoKey, 320)}" alt="" />` : ""}${v.tenant.name}</a>
   <span class="spacer"></span>
+  ${v.cartCount !== undefined
+    ? html`<a class="cart-link" href="/cart">Koszyk${v.cartCount ? html` <span class="count">${v.cartCount}</span>` : ""}</a>`
+    : ""}
 </div></header>`;
 
 const footer = async (v: HomeView | PageView) => html`<footer><div class="wrap">
