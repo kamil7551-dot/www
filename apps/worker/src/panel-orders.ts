@@ -98,7 +98,7 @@ export function orderRoutes(
               <p class="sub">${when(order.created_at)}</p>
               <p><strong>${order.customer_name}</strong><br />
                 <a href="mailto:${order.email}">${order.email}</a>${order.phone ? html`<br /><a href="tel:${order.phone}">${order.phone}</a>` : ""}</p>
-              <p>${order.delivery === "courier" ? html`Kurier na adres:<br /><strong>${order.address}</strong>` : "Odbiór osobisty"}</p>
+              <p>${order.delivery === "courier" ? html`Kurier na adres:<br /><strong class="msgtext">${order.address}</strong>` : "Odbiór osobisty"}</p>
               <p>${order.payment === "transfer" ? html`Przelew na ${formatIban(settings.bankAccount)}, tytuł „Zamówienie nr ${order.number}”` : "Płatność przy odbiorze"}</p>
               ${order.note ? html`<p class="msgtext">Uwagi: ${order.note}</p>` : ""}
             </div>

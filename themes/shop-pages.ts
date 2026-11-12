@@ -119,7 +119,7 @@ export function orderPage(order: Order, settings: SiteSettings, justPlaced: bool
       : ""}
     ${order.delivery === "pickup"
       ? html`<p>Odbiór osobisty${settings.address ? html`: <strong>${settings.address}</strong>` : ""}${settings.hours ? html`, ${settings.hours}` : ""}. Płatność przy odbiorze.</p>`
-      : html`<p>Dostawa kurierem na adres: <strong>${order.address}</strong></p>`}
+      : html`<p>Dostawa kurierem na adres:<br /><strong class="addr">${order.address}</strong></p>`}
     <div class="summary">
       ${order.lines.map((l) => html`<p><span>${l.qty} × ${l.name}</span><span>${zl(l.price * l.qty)}</span></p>`)}
       ${order.delivery_price ? html`<p><span>Dostawa</span><span>${zl(order.delivery_price)}</span></p>` : ""}
