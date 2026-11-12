@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-12 | Claude | Strona produktu `/p/<adres>` z danymi Product/Offer dla Google, szablon `shop` (siatka produktów), układ stron w szablonach (`page`), unikalne adresy pozycji o tej samej nazwie | PR `feat/storefront-item-page` | Szablon dostaje gotową treść strony w `PageView.body` i tylko ją opakowuje; bez `page` używany jest `defaultPage` z `themes/shared.ts`. Wspólne komponenty i ich CSS (`SHARED_CSS`) są w `themes/shared.ts`. CSS w szablonie wstawiaj przez `raw()`, bo `html``` escapuje cudzysłowy. Szablon `shop` pokazuje slot `item.after` tylko na stronie produktu. Następne: koszyk i zamówienia |
 | 2026-11-12 | Claude | Panel: strzałki kolejności dla kategorii i pozycji (pozycje w obrębie swojej kategorii), zmiana nazwy i usuwanie kategorii, lista pozycji pogrupowana jak na stronie, wyszukiwarka i filtry (kategoria, status, „brak dziś”) | PR `feat/core-ordering-filters` | Nowe pozycje i kategorie trafiają na koniec (`max(position)+1`). Pierwsze przesunięcie przenumerowuje rodzeństwo, więc stare wiersze z `position` 0 też działają. `TenantDb.batch` = kilka zapytań w jednej transakcji. Szukanie po nazwie jest w JS, bo LIKE w SQLite nie rozróżnia wielkości polskich liter; przy tysiącach pozycji (etap 5) przenieść do FTS. Przy aktywnych filtrach strzałki są ukryte. Nowe zdarzenia: `category.updated`, `category.deleted` |
 | 2026-11-12 | Claude | Zakładka „Kod QR” w panelu: kod do strony (własna domena, jeśli jest), pobieranie PNG i SVG, arkusz A4 do druku (1 duży albo 6 na stoliki); formularz dodawania pozycji podpowiada rodzaj według typu strony | PR `feat/qr-code` | Kod generuje `uqr` tylko po stronie serwera (0 KB JS u klienta); PNG składamy sami (`core/qr.ts`, CompressionStream). PDF = druk z przeglądarki, bez biblioteki PDF. `jsqr` jest tylko w testach i sprawdza, że kod da się zeskanować. Do zrobienia: kolejność kategorii w panelu (teraz alfabetycznie, bo wszystkie mają `position` 0) |
 | 2026-11-12 | Claude | Menu QR: szablon `qr-card` (pasek kategorii, ceny, alergeny z legendą, przekreślone dania „brak dziś”), 14 alergenów UE przy daniach, przycisk „Brak dziś” na liście pozycji w panelu | PR `feat/qr-menu` | „Brak dziś” zapisuje `sold_out_until` = północ w Polsce, więc danie wraca samo następnego dnia; sprawdzaj przez `isSoldOut()`. Alergeny trzymamy jako id (`core/allergens.ts`), numery 1–14 to kolejność z rozporządzenia, nie zmieniaj jej. Formularz pozycji wysyła `allergensShown`, żeby odznaczenie wszystkich czyściło listę |
@@ -95,7 +96,7 @@ Cel: prawdziwe zamówienia i płatności.
 - [ ] Moduł `shipping-inpost` (Paczkomaty)
 - [ ] Maile: potwierdzenie zamówienia, wysyłka
 - [ ] Regulamin, polityka prywatności, zwroty (szablony do uzupełnienia)
-- [ ] Szablon `simple`: prosty układ, płytkie drzewko kategorii
+- [x] Szablon `shop`: siatka produktów w kategoriach i osobna strona każdego produktu (z danymi produktu dla Google)
 - [ ] Panel: lista zamówień, zmiana statusu
 
 ## Etap 5: Sklep duży

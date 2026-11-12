@@ -1,6 +1,6 @@
 import { html, raw } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { Item } from "./catalog";
+import { isSoldOut, type Item } from "./catalog";
 import type { SiteSettings } from "./settings";
 import type { Tenant } from "./tenants";
 
@@ -57,6 +57,38 @@ export function seoHead({ tenant, settings, url, logoUrl, items = [] }: SeoInput
     <meta property="og:description" content="${description}" />
     <meta property="og:url" content="${url}" />
     ${logoUrl ? html`<meta property="og:image" content="${logoUrl}" />` : ""}
+    <script type="application/ld+json">${raw(safeJson(data))}</script>`;
+}
+
+/** SEO for one product, service or dish: Google can show its price and availability in results. */
+export function itemSeoHead(input: { tenant: Tenant; item: Item; url: string; imageUrl?: string }) {
+  const { tenant, item, url, imageUrl } = input;
+  const description = (item.description || `${item.name} – ${tenant.name}`).replace(/\s+/g, " ").slice(0, 160);
+  const data: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": item.kind === "service" ? "Service" : "Product",
+    name: item.name,
+    description,
+    url,
+    offers: {
+      "@type": "Offer",
+      price: (item.price / 100).toFixed(2),
+      priceCurrency: item.currency,
+      availability: isSoldOut(item) ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+      url,
+    },
+  };
+  if (item.kind === "service") data.provider = { "@type": SCHEMA_TYPE[tenant.kind], name: tenant.name };
+  else data.brand = { "@type": "Brand", name: tenant.name };
+  if (imageUrl) data.image = imageUrl;
+  return html`<title>${item.name} – ${tenant.name}</title>
+    <meta name="description" content="${description}" />
+    <link rel="canonical" href="${url}" />
+    <meta property="og:type" content="product" />
+    <meta property="og:title" content="${item.name}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:url" content="${url}" />
+    ${imageUrl ? html`<meta property="og:image" content="${imageUrl}" />` : ""}
     <script type="application/ld+json">${raw(safeJson(data))}</script>`;
 }
 

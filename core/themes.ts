@@ -21,6 +21,19 @@ export interface HomeView {
   mediaUrl: (key: string, width?: number) => string;
 }
 
+/** Any page other than the home page (item, cart, checkout…). The platform renders the content; the theme wraps it. */
+export interface PageView {
+  tenant: Tenant;
+  settings: SiteSettings;
+  /** Page title shown in the theme's layout, e.g. the product name. */
+  title: string;
+  /** Ready content of the page, built from the shared components in themes/shared. */
+  body: Html;
+  seo: HtmlEscapedString | Promise<HtmlEscapedString>;
+  slot: HomeView["slot"];
+  mediaUrl: HomeView["mediaUrl"];
+}
+
 export interface ThemeDefinition {
   /** kebab-case, unique, never changes. */
   id: string;
@@ -28,6 +41,8 @@ export interface ThemeDefinition {
   /** Site kinds this theme can show. */
   kinds: SiteKind[];
   home: (view: HomeView) => Html;
+  /** Layout around other pages. Optional: without it the platform uses a plain default layout. */
+  page?: (view: PageView) => Html;
 }
 
 export function defineTheme<const T extends ThemeDefinition>(def: T): T {

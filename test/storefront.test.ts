@@ -51,7 +51,7 @@ describe("site settings", () => {
 describe("storefront theme", () => {
   it("shows settings, groups items by category and hides inactive ones", async () => {
     const s = await site("serwis");
-    await s.settings.update({ tagline: "Serwis <b>komputerów</b>", phone: "+48 600 100 200", accent: "#123456" });
+    await s.settings.update({ tagline: "Serwis <b>komputerów</b>", phone: "+48 600 100 200", accent: "#123456", theme: "simple" });
     const cat = await s.catalog.createCategory({ name: "Naprawy" });
     await s.catalog.createItem({ kind: "service", name: "Wymiana dysku", price: 15000, categoryId: cat.id });
     await s.catalog.createItem({ kind: "product", name: "Pendrive", price: 3900 });
@@ -75,7 +75,8 @@ describe("storefront theme", () => {
     expect(themes.pick("qr-menu", "only-shop").id).toBe("qr-card");
     expect(themes.pick("qr-menu", "simple").id).toBe("simple");
     expect(themes.pick("shop", "only-shop").id).toBe("only-shop");
-    expect(themes.pick("shop", "missing").id).toBe("simple");
+    expect(themes.pick("shop", "missing").id).toBe("shop");
+    expect(themes.pick("shop", "simple").id).toBe("simple");
     expect(() => defineTheme({ id: "X!", name: "x", kinds: ["shop"], home: () => html`` })).toThrow();
   });
 });
@@ -100,12 +101,14 @@ describe("module slots", () => {
   it("renders only enabled modules, escapes plain strings and survives a broken module", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const on = await site("z-modulem");
+    await on.settings.update({ theme: "simple" }); // the simple theme shows item.after on the home page
     await on.catalog.createItem({ kind: "product", name: "Myszka", price: 100 });
     const platform = { ...testPlatform() };
     platform.modules.register(badge, broken);
     await platform.modules.enable(new TenantDb(env.DB, on.id), "test-badge");
     await platform.modules.enable(new TenantDb(env.DB, on.id), "test-broken");
     const off = await site("bez-modulu");
+    await off.settings.update({ theme: "simple" });
     await off.catalog.createItem({ kind: "product", name: "Myszka", price: 100 });
 
     const withModule = await render("z-modulem", [badge, broken]);
