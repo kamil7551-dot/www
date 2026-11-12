@@ -1,6 +1,7 @@
 import { html } from "hono/html";
 import { ALLERGENS, allergenNumber, defineTheme, isSoldOut, parseAllergens, type HomeView, type Item } from "../../core";
 import { groups, mapsUrl, telHref, zl } from "../shared";
+import { legalLinks } from "../legal";
 
 /**
  * QR menu card: built for a phone held at the table. Sticky category bar, dishes with prices,
@@ -60,6 +61,7 @@ export default defineTheme({
             .legend{margin:2rem 0 0;font-size:.85rem;color:var(--muted)}.legend b{color:var(--ink)}
             footer{margin-top:2rem;padding:1.25rem 0 2rem;border-top:1px solid var(--line);font-size:.95rem}
             footer p{margin:.25rem 0}a{color:var(--accent)}
+            .legal-links{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.5rem;font-size:.9rem}
           </style>
           ${await v.slot("head", {})}
         </head>
@@ -95,6 +97,7 @@ export default defineTheme({
             ${s.hours ? html`<p>Otwarte: ${s.hours}</p>` : ""}
             ${s.address ? html`<p><a href="${mapsUrl(s.address)}" rel="noopener" target="_blank">${s.address}</a></p>` : ""}
             ${s.phone ? html`<p><a href="${telHref(s.phone)}">${s.phone}</a></p>` : ""}
+            ${legalLinks(v.tenant.kind)}
             ${await v.slot("footer", {})}
           </div></footer>
         </body>

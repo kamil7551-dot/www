@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-12 | Claude | Wzory stron prawnych (`themes/legal.ts`): regulamin i odstąpienie od umowy w sklepie, polityka prywatności na każdej stronie, linki w stopce każdego szablonu; karta „Dane firmy” w panelu (pełna nazwa, NIP z cyfrą kontrolną, dodatkowe postanowienia); obowiązkowy checkbox regulaminu w zamówieniu | PR `feat/core-legal-pages` | To wzory, nie porada prawna: panel mówi to sprzedawcy. Zmiana treści tylko z datowaną notką tutaj. Polityka prywatności opisuje tylko ciasteczko koszyka; nowe ciasteczka lub narzędzia analityczne wymagają jej aktualizacji |
 | 2026-11-12 | Claude | Panel: zakładka „Zamówienia” z licznikiem nowych, filtr po statusie, szczegóły zamówienia, zmiana statusu z mailem do klienta; karta „Sprzedaż” w ustawieniach (odbiór osobisty, cena kuriera, numer konta) | PR `feat/panel-orders` | Ekrany zamówień są w `apps/worker/src/panel-orders.ts`, ale członkostwo nadal sprawdza `siteFor()` z `panel.ts`. Mail o statusie nie ma linku do zamówienia (trzymamy tylko skrót sekretu). Zostało w etapie 4: P24 (potrzebne konto sprzedawcy w Przelewy24), InPost, regulamin i polityka prywatności |
 | 2026-11-12 | Claude | Koszyk w ciasteczku (bez JS), formularz zamówienia z odbiorem osobistym lub kurierem, strona zamówienia dla klienta z danymi do przelewu, maile do klienta i sprzedawcy | PR `feat/storefront-cart` | Strony sklepu (`/cart`, `/checkout`, `/order/:id`) składa `themes/shop-pages.ts`, szablon tylko je opakowuje przez `page`. Działają tylko dla rodzaju `shop`. Maile idą przez `waitUntil` i ich błąd nie psuje zamówienia. Link w mailu do sprzedawcy prowadzi do `/sites/:site/orders/:id` w panelu, ten ekran dojdzie w następnym PR |
 | 2026-11-12 | Claude | Rdzeń zamówień: tabele `orders` i `order_items`, numeracja per sklep, ceny zawsze z katalogu, link do zamówienia z sekretem (trzymamy tylko skrót), statusy ze zdarzeniami `order.*`; ustawienia sklepu: odbiór osobisty, kurier z ceną, numer konta (sprawdzany sumą IBAN) | PR `feat/core-orders` | Płatności na razie: odbiór osobisty = płatność na miejscu, kurier = przelew na konto z ustawień (bez konta kurier jest niedostępny). P24 dojdzie jako moduł. Pozycje zamówienia kopiują nazwę i cenę. Następne: koszyk i formularz zamówienia, maile, panel zamówień |
@@ -98,7 +99,7 @@ Cel: prawdziwe zamówienia i płatności.
 - [ ] Moduł `payments-p24` (Przelewy24 z BLIK)
 - [ ] Moduł `shipping-inpost` (Paczkomaty)
 - [x] Maile: potwierdzenie zamówienia, wysyłka (i inne zmiany statusu, na życzenie sprzedawcy)
-- [ ] Regulamin, polityka prywatności, zwroty (szablony do uzupełnienia)
+- [x] Regulamin, polityka prywatności, zwroty (szablony do uzupełnienia)
 - [x] Szablon `shop`: siatka produktów w kategoriach i osobna strona każdego produktu (z danymi produktu dla Google)
 - [x] Panel: lista zamówień, zmiana statusu, ustawienia dostawy i numeru konta
 

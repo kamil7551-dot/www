@@ -1,6 +1,7 @@
 import { html } from "hono/html";
 import { defineTheme, type HomeView } from "../../core";
 import { groups, telHref, zl } from "../shared";
+import { legalLinks } from "../legal";
 
 /** Default theme: one light page for every site kind. Zero JavaScript. */
 export default defineTheme({
@@ -28,6 +29,7 @@ export default defineTheme({
             .pic{display:block;width:100%;max-width:22rem;aspect-ratio:4/3;object-fit:cover;border-radius:6px;margin:.4rem 0}
             footer{color:#444;font-size:.95rem;border-top:1px solid #eee}footer p{margin:.3rem 0}
             a{color:var(--accent)}
+            .legal-links{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.5rem;font-size:.9rem}
           </style>
           ${await v.slot("head", {})}
         </head>
@@ -63,6 +65,7 @@ export default defineTheme({
             ${s.address ? html`<p>${s.address}</p>` : ""}
             ${s.phone ? html`<p><a href="${telHref(s.phone)}">${s.phone}</a></p>` : ""}
             ${s.email ? html`<p><a href="mailto:${s.email}">${s.email}</a></p>` : ""}
+            ${legalLinks(v.tenant.kind)}
             ${await v.slot("footer", {})}
           </footer>
         </body>

@@ -44,7 +44,7 @@ function visitor(slug: string) {
   return { go, outbox, cookie: () => cookie };
 }
 
-const buyer = { name: "Anna Nowak", email: "anna@example.com", phone: "600100200", delivery: "courier", address: "ul. Długa 1, 00-001 Warszawa" };
+const buyer = { name: "Anna Nowak", email: "anna@example.com", phone: "600100200", delivery: "courier", address: "ul. Długa 1, 00-001 Warszawa", terms: "1" };
 
 describe("cart", () => {
   it("adds, changes and removes products, counting them in the header", async () => {
@@ -121,6 +121,17 @@ describe("checkout", () => {
     expect(res.status).toBe(400);
     expect(res.body).toContain("Podaj pełny adres dostawy.");
     expect(res.body).toContain('value="Anna Nowak"');
+    expect(await s.orders.list()).toHaveLength(0);
+  });
+
+  it("asks for the terms to be accepted before placing the order", async () => {
+    const s = await shop("kasa-regulamin");
+    const v = visitor("kasa-regulamin");
+    await v.go("/cart/add", { itemId: s.mouse.id });
+    const res = await v.go("/checkout", { ...buyer, terms: "" });
+    expect(res.status).toBe(400);
+    expect(res.body).toContain("Zaakceptuj regulamin");
+    expect(res.body).toContain('href="/regulamin"');
     expect(await s.orders.list()).toHaveLength(0);
   });
 

@@ -1,5 +1,6 @@
 import { html, raw } from "hono/html";
 import { defineTheme, isSoldOut, type HomeView, type Item, type PageView } from "../../core";
+import { legalLinks } from "../legal";
 import { SHARED_CSS, groups, itemHref, telHref, zl } from "../shared";
 
 /** accent is validated as #rrggbb when saved and read, so it is safe inside CSS. */
@@ -43,6 +44,7 @@ const footer = async (v: HomeView | PageView) => html`<footer><div class="wrap">
   ${v.settings.address ? html`<p>${v.settings.address}</p>` : ""}
   ${v.settings.phone ? html`<p><a href="${telHref(v.settings.phone)}">${v.settings.phone}</a></p>` : ""}
   ${v.settings.email ? html`<p><a href="mailto:${v.settings.email}">${v.settings.email}</a></p>` : ""}
+  ${legalLinks(v.tenant.kind)}
   ${await v.slot("footer", {})}
 </div></footer>`;
 
