@@ -16,6 +16,7 @@ import {
   type Platform,
   type Tenant,
 } from "../../../core";
+import { privacyPage, termsPage, withdrawalPage } from "../../../themes/legal";
 import { addToCart, cartPage, checkoutPage, orderMails, orderPage } from "../../../themes/shop-pages";
 import { defaultPage, itemDetail } from "../../../themes/shared";
 import { cartCount, changeCart, readCart, writeCart } from "./cart";
@@ -145,11 +146,22 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
         seo: html`<title>${title} – ${tenant.name}</title><meta name="robots" content="noindex" />`,
         slot: (name, data) => site.slot(name, data, { tenant, settings }),
         mediaUrl,
-        cartCount: cartCount(readCart(c)),
+        cartCount: tenant.kind === "shop" ? cartCount(readCart(c)) : undefined,
       }),
       status,
     );
   }
+
+  // ---------- Legal pages: privacy for every site, terms and returns for shops ----------
+
+  const legal = async (c: C) => {
+    const tenant = c.get("tenant");
+    const settings = await forTenant(platform, c.env.DB, tenant.id).settings.get();
+    return { tenant, settings, origin: new URL(c.req.url).origin };
+  };
+  app.get("/polityka-prywatnosci", async (c) => shopPage(c, "Polityka prywatności", privacyPage(await legal(c))));
+  app.get("/regulamin", async (c) => (c.get("tenant").kind === "shop" ? shopPage(c, "Regulamin", termsPage(await legal(c))) : c.notFound()));
+  app.get("/odstapienie", async (c) => (c.get("tenant").kind === "shop" ? shopPage(c, "Zwroty", withdrawalPage(await legal(c))) : c.notFound()));
 
   app.use("/cart/*", async (c, next) => (c.get("tenant").kind === "shop" ? next() : c.notFound()));
   app.use("/cart", async (c, next) => (c.get("tenant").kind === "shop" ? next() : c.notFound()));
@@ -210,6 +222,11 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
     };
     const cart = readCart(c);
     const settings = await site.settings.get();
+    if (form.terms !== "1") {
+      const priced = await site.orders.price(cart);
+      if (!priced.lines.length) return c.redirect("/cart", 303);
+      return shopPage(c, "Zamówienie", checkoutPage(priced, settings, input, "terms"), 400);
+    }
     let placed;
     try {
       placed = await site.orders.place(cart, input, settings);

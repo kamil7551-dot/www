@@ -1,4 +1,5 @@
 import { html, raw } from "hono/html";
+import { legalLinks } from "./legal";
 import { isSoldOut, type Category, type HomeView, type Item, type PageView } from "../core";
 
 /** Helpers every theme may use. Themes stay free to look different; behaviour stays the same. */
@@ -97,7 +98,12 @@ input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
 .choice{grid-template-columns:auto 1fr!important;align-items:start;border:1px solid #d7dae0;border-radius:10px;padding:.8rem;font-weight:400!important}
 .choice input{width:auto;margin:.3rem .3rem 0 0}.choice:has(input:checked){border-color:var(--accent);background:#f6f8ff}
 .pay{border:2px solid var(--accent);border-radius:12px;padding:1rem 1.2rem;margin:1rem 0;max-width:34rem}
-.pay h2{margin:0 0 .6rem;font-size:1.1rem}.pay p{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin:.3rem 0}`;
+.pay h2{margin:0 0 .6rem;font-size:1.1rem}.pay p{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin:.3rem 0}
+.terms{display:flex!important;gap:.5rem;align-items:flex-start;font-weight:400!important;font-size:.9rem}.terms input{width:auto;margin-top:.25rem}
+.legal{max-width:46rem}.legal h2{font-size:1.15rem;margin:1.6rem 0 .5rem}.legal p,.legal li{line-height:1.6}.legal .pre{white-space:pre-line}
+.form-print{border:1px dashed #b9bec8;border-radius:10px;padding:1rem 1.25rem;margin-top:1rem}.form-print .blank{margin:1.5rem 0}
+.legal-links{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.6rem;font-size:.9rem}
+@media print{header,footer,.legal-links{display:none}.form-print{border:0}}`;
 
 /** Plain layout for pages of themes that do not define their own. */
 export const defaultPage = async (v: PageView) => html`<!doctype html>
@@ -118,6 +124,6 @@ export const defaultPage = async (v: PageView) => html`<!doctype html>
     <body>
       <header><a href="/">${v.tenant.name}</a></header>
       <main>${v.body}</main>
-      <footer>${await v.slot("footer", {})}</footer>
+      <footer>${legalLinks(v.tenant.kind)}${await v.slot("footer", {})}</footer>
     </body>
   </html>`;

@@ -17,6 +17,12 @@ export interface SiteSettings {
   logoKey: string | null;
   /** Theme id; empty = the default theme for the site kind. */
   theme: string;
+  /** Legal name of the business for terms and privacy policy, e.g. "Jan Kowalski Serwis Laptopów". */
+  companyName: string;
+  /** Polish tax id, 10 digits; "" when the seller has none. */
+  nip: string;
+  /** Seller's own extra rules appended to the shop terms. */
+  extraTerms: string;
   /** Shop: courier delivery price in grosze; null = no courier delivery. */
   courierPrice: number | null;
   /** Shop: customers may pick up the order in person. */
@@ -35,12 +41,15 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   accent: "#2f6fed",
   logoKey: null,
   theme: "",
+  companyName: "",
+  nip: "",
+  extraTerms: "",
   courierPrice: null,
   pickup: true,
   bankAccount: "",
 };
 
-const LIMITS: Partial<Record<keyof SiteSettings, number>> = { tagline: 160, about: 3000, address: 200, hours: 200, phone: 30, theme: 40 };
+const LIMITS: Partial<Record<keyof SiteSettings, number>> = { tagline: 160, about: 3000, companyName: 160, extraTerms: 5000, address: 200, hours: 200, phone: 30, theme: 40 };
 
 /** Validates a partial update and returns the cleaned values. Throws ValidationError with a field name. */
 export function cleanSettings(patch: Partial<Record<keyof SiteSettings, unknown>>): Partial<SiteSettings> {
@@ -76,12 +85,22 @@ export function cleanSettings(patch: Partial<Record<keyof SiteSettings, unknown>
     const max = LIMITS[key];
     if (max && value.length > max) throw new ValidationError(`${key}: max ${max} characters`);
     if (key === "email" && value && !normalizeEmail(value)) throw new ValidationError("email");
+    if (key === "nip" && value && !validNip(value)) throw new ValidationError("nip");
     if (key === "phone" && value && !/^\+?[\d\s()-]{6,30}$/.test(value)) throw new ValidationError("phone");
     if (key === "accent" && !/^#[0-9a-f]{6}$/i.test(value)) throw new ValidationError("accent");
     if (key === "theme" && value && !/^[a-z][a-z0-9-]*$/.test(value)) throw new ValidationError("theme");
-    out[key] = key === "email" ? value.toLowerCase() : key === "accent" ? value.toLowerCase() : value;
+    out[key] = key === "email" || key === "accent" ? value.toLowerCase() : key === "nip" ? value.replace(/\D/g, "") : value;
   }
   return out;
+}
+
+/** NIP: 10 digits (dashes and spaces allowed) with a valid check digit. */
+export function validNip(input: string): boolean {
+  const d = input.replace(/[\s-]/g, "").replace(/^PL/i, "");
+  if (!/^\d{10}$/.test(d)) return false;
+  const weights = [6, 5, 7, 2, 3, 4, 5, 6, 7];
+  const sum = weights.reduce((acc, w, i) => acc + w * Number(d[i]), 0);
+  return sum % 11 === Number(d[9]);
 }
 
 /**

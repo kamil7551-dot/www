@@ -64,6 +64,7 @@ const ERROR_TEXT: Record<string, string> = {
   delivery: "Wybierz sposób dostawy.",
   cart: "Koszyk jest pusty.",
   "cart-changed": "Część produktów nie jest już dostępna. Sprawdź koszyk.",
+  terms: "Zaakceptuj regulamin, żeby złożyć zamówienie.",
 };
 
 export function checkoutPage(cart: PricedCart, settings: SiteSettings, values: Partial<Checkout> = {}, error = "") {
@@ -97,6 +98,8 @@ export function checkoutPage(cart: PricedCart, settings: SiteSettings, values: P
             ${cart.lines.map((l) => html`<p><span>${l.qty} × ${l.item.name}</span><span>${zl(l.total)}</span></p>`)}
             <p><span>Razem za produkty</span><strong>${zl(cart.itemsTotal)}</strong></p>
             <p class="muted">Do tego koszt wybranej dostawy.</p>
+            <label class="terms"><input type="checkbox" name="terms" value="1" required />
+              <span>Akceptuję <a href="/regulamin" target="_blank">regulamin</a> i zapoznałem(-am) się z <a href="/polityka-prywatnosci" target="_blank">polityką prywatności</a>.</span></label>
             <button class="buy-btn">Zamawiam i płacę</button>
             <a class="back" href="/cart">← Wróć do koszyka</a>
           </div>

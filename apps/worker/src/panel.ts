@@ -821,6 +821,19 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
             </label>
             <div class="actions"><span></span><button class="btn primary">Zapisz ustawienia</button></div>
           </div>
+          <div class="card">
+            <h2>Dane firmy</h2>
+            <div class="grid two">
+              ${field("companyName", "Pełna nazwa firmy", "text", "Jak w CEIDG lub KRS. Pusta = nazwa strony.")}
+              ${field("nip", "NIP", "text", "Opcjonalnie. Sprawdzamy cyfrę kontrolną.")}
+            </div>
+            ${site.tenant.kind === "shop"
+              ? html`<label class="field"><span>Dodatkowe postanowienia regulaminu</span><textarea name="extraTerms" maxlength="5000" rows="4">${s.extraTerms}</textarea></label>`
+              : ""}
+            <p class="hint">Na stronie są gotowe wzory: ${site.tenant.kind === "shop" ? "regulamin, odstąpienie od umowy i " : ""}polityka prywatności, uzupełniane tymi danymi.
+              To wzory, a nie porada prawna: przed startem sprzedaży warto pokazać je prawnikowi lub księgowej.</p>
+            <div class="actions"><span></span><button class="btn primary">Zapisz ustawienia</button></div>
+          </div>
           ${site.tenant.kind === "shop"
             ? html`<div class="card">
                 <h2>Sprzedaż</h2>
@@ -848,9 +861,10 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     const back = `/sites/${site.tenantId}/settings`;
     const form = await c.req.parseBody();
     const patch: Record<string, unknown> = {};
-    for (const key of ["tagline", "about", "email", "phone", "address", "hours", "accent", "theme"] as const) {
+    for (const key of ["tagline", "about", "email", "phone", "address", "hours", "accent", "theme", "companyName", "nip"] as const) {
       if (typeof form[key] === "string") patch[key] = form[key];
     }
+    if (site.tenant.kind === "shop" && typeof form.extraTerms === "string") patch.extraTerms = form.extraTerms;
     if (form.shopFields && site.tenant.kind === "shop") {
       patch.pickup = form.pickup === "1";
       const price = String(form.courierPrice ?? "").trim();
@@ -871,6 +885,9 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
       about: "O nas",
       address: "Adres",
       hours: "Godziny otwarcia",
+      companyName: "Pełna nazwa firmy",
+      nip: "NIP (sprawdź cyfry)",
+      extraTerms: "Dodatkowe postanowienia regulaminu",
     };
     try {
       cleanSettings(patch); // validate before uploading, so a rejected form leaves no file behind

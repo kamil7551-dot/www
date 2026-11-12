@@ -1,6 +1,7 @@
 import { html } from "hono/html";
 import { defineTheme, type HomeView } from "../../core";
 import { contactForm, groups, itemImage, mapsUrl, telHref, zl } from "../shared";
+import { legalLinks } from "../legal";
 
 /** Business card: one page with hero, offer, contact details and a contact form. Zero JavaScript. */
 export default defineTheme({
@@ -46,6 +47,7 @@ export default defineTheme({
             .flash{padding:.8rem 1rem;border-radius:10px;font-weight:600}.flash.ok{background:#e6f6ec;color:#11683a}
             .flash.err{background:#fdecea;color:#a3271a}
             footer{border-top:1px solid var(--line);color:var(--muted);font-size:.9rem;padding:1.5rem 0}
+            .legal-links{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.5rem;font-size:.9rem}
           </style>
           ${await v.slot("head", {})}
         </head>
@@ -106,7 +108,7 @@ export default defineTheme({
               </div>
             </div></section>
           </main>
-          <footer><div class="wrap">© ${v.tenant.name} ${await v.slot("footer", {})}</div></footer>
+          <footer><div class="wrap">© ${v.tenant.name} ${legalLinks(v.tenant.kind)} ${await v.slot("footer", {})}</div></footer>
         </body>
       </html>`;
   },
