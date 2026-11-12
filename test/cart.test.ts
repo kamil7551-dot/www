@@ -128,8 +128,7 @@ describe("checkout", () => {
     const s = await shop("kasa-regulamin");
     const v = visitor("kasa-regulamin");
     await v.go("/cart/add", { itemId: s.mouse.id });
-    const { terms: _, ...noTerms } = buyer;
-    const res = await v.go("/checkout", noTerms);
+    const res = await v.go("/checkout", { ...buyer, terms: "" });
     expect(res.status).toBe(400);
     expect(res.body).toContain("Zaakceptuj regulamin");
     expect(res.body).toContain('href="/regulamin"');
