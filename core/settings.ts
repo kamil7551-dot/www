@@ -17,6 +17,12 @@ export interface SiteSettings {
   logoKey: string | null;
   /** Theme id; empty = the default theme for the site kind. */
   theme: string;
+  /** Shop: courier delivery price in grosze; null = no courier delivery. */
+  courierPrice: number | null;
+  /** Shop: customers may pick up the order in person. */
+  pickup: boolean;
+  /** Shop: account for bank transfers, "PL" + 26 digits. */
+  bankAccount: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -29,6 +35,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   accent: "#2f6fed",
   logoKey: null,
   theme: "",
+  courierPrice: null,
+  pickup: true,
+  bankAccount: "",
 };
 
 const LIMITS: Partial<Record<keyof SiteSettings, number>> = { tagline: 160, about: 3000, address: 200, hours: 200, phone: 30, theme: 40 };
@@ -43,6 +52,25 @@ export function cleanSettings(patch: Partial<Record<keyof SiteSettings, unknown>
       out.logoKey = raw === "" ? null : (raw as string | null);
       continue;
     }
+    if (key === "courierPrice") {
+      if (raw !== null && raw !== "" && !(Number.isInteger(raw) && (raw as number) >= 0 && (raw as number) <= 1_000_000)) {
+        throw new ValidationError("courierPrice");
+      }
+      out.courierPrice = raw === null || raw === "" ? null : (raw as number);
+      continue;
+    }
+    if (key === "pickup") {
+      if (typeof raw !== "boolean") throw new ValidationError("pickup");
+      out.pickup = raw;
+      continue;
+    }
+    if (key === "bankAccount") {
+      if (typeof raw !== "string") throw new ValidationError("bankAccount");
+      const iban = cleanIban(raw);
+      if (iban === null) throw new ValidationError("bankAccount");
+      out.bankAccount = iban;
+      continue;
+    }
     if (typeof raw !== "string") throw new ValidationError(key);
     const value = raw.trim();
     const max = LIMITS[key];
@@ -55,6 +83,24 @@ export function cleanSettings(patch: Partial<Record<keyof SiteSettings, unknown>
   }
   return out;
 }
+
+/**
+ * Polish account number as "PL" + 26 digits, checked with the IBAN checksum so a typo
+ * never sends customers' money to a wrong account. "" stays "" (no account). null = invalid.
+ */
+export function cleanIban(input: string): string | null {
+  const compact = input.replace(/[\s-]/g, "").toUpperCase();
+  if (!compact) return "";
+  const iban = /^\d{26}$/.test(compact) ? `PL${compact}` : compact;
+  if (!/^PL\d{26}$/.test(iban)) return null;
+  const digits = (iban.slice(4) + iban.slice(0, 4)).replace(/[A-Z]/g, (ch) => String(ch.charCodeAt(0) - 55));
+  let rest = 0;
+  for (const d of digits) rest = (rest * 10 + Number(d)) % 97;
+  return rest === 1 ? iban : null;
+}
+
+/** "PL61 1090 1014 0000 0712 1981 2874" for people. */
+export const formatIban = (iban: string) => iban.replace(/^(PL\d{2})(\d+)$/, (_, head: string, rest: string) => `${head} ${rest.replace(/(\d{4})(?=\d)/g, "$1 ")}`);
 
 export class Settings {
   constructor(private db: TenantDb) {}
