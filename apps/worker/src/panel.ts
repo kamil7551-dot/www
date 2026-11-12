@@ -10,6 +10,7 @@ import {
   auth,
   cleanSettings,
   forTenant,
+  formatIban,
   isSoldOut,
   newId,
   parseAllergens,
@@ -25,11 +26,12 @@ import {
   type SiteSettings,
 } from "../../../core";
 import { parsePrice, zl } from "./layout";
+import { orderRoutes } from "./panel-orders";
 import { PANEL_CSS, PANEL_CSS_VERSION, authPage, notice, panelPage, type SiteNav } from "./panel-ui";
 
 export const SESSION_COOKIE = "__Host-sid";
 
-type PanelEnv = { Bindings: Env; Variables: { user: auth.SessionUser } };
+export type PanelEnv = { Bindings: Env; Variables: { user: auth.SessionUser } };
 type C = Context<PanelEnv>;
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -236,7 +238,10 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
       .first<{ name: string; slug: string; kind: string }>();
     if (!tenant) return null;
     const api = forTenant(platform, c.env.DB, tenantId);
-    const unread = await api.inbox.unreadCount();
+    const [unread, newOrders] = await Promise.all([
+      api.inbox.unreadCount(),
+      tenant.kind === "shop" ? api.orders.countNew() : Promise.resolve(undefined),
+    ]);
     const url = new URL(c.req.url);
     const publicUrl = `${url.protocol}//${tenant.slug}.${c.env.PLATFORM_DOMAIN}${url.port ? `:${url.port}` : ""}/`;
     const nav = (active: SiteNav["active"]): SiteNav => ({
@@ -246,6 +251,7 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
       isOwner: role === "owner",
       active,
       unread: active === "messages" ? 0 : unread,
+      newOrders,
     });
     return { tenantId, role, nav, tenant, publicUrl, media: new Media(c.env.MEDIA, tenantId, c.env.IMAGES), ...api };
   }
@@ -640,6 +646,8 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     return c.redirect(`/sites/${site.tenantId}/categories?ok=1`, 303);
   });
 
+  orderRoutes(app, { siteFor, notFound, mailer });
+
   // ---------- Contact form messages: any member ----------
 
   app.get("/sites/:site/messages", async (c) => {
@@ -813,6 +821,22 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
             </label>
             <div class="actions"><span></span><button class="btn primary">Zapisz ustawienia</button></div>
           </div>
+          ${site.tenant.kind === "shop"
+            ? html`<div class="card">
+                <h2>Sprzedaż</h2>
+                <input type="hidden" name="shopFields" value="1" />
+                <label class="check"><input type="checkbox" name="pickup" value="1" ${s.pickup ? "checked" : ""} /> Odbiór osobisty (płatność na miejscu)</label>
+                <div class="grid two">
+                  <label class="field"><span>Kurier: cena dostawy (zł)</span>
+                    <input name="courierPrice" value="${s.courierPrice === null ? "" : priceField(s.courierPrice)}" inputmode="decimal" placeholder="np. 15,99" />
+                    <span class="hint">Puste pole = bez wysyłki kurierem.</span></label>
+                  <label class="field"><span>Numer konta do przelewów</span>
+                    <input name="bankAccount" value="${s.bankAccount ? formatIban(s.bankAccount) : ""}" inputmode="numeric" placeholder="PL00 0000 0000 0000 0000 0000 0000" />
+                    <span class="hint">Potrzebny przy wysyłce kurierem: klient płaci przelewem.</span></label>
+                </div>
+                <div class="actions"><span></span><button class="btn primary">Zapisz ustawienia</button></div>
+              </div>`
+            : ""}
         </form>`,
       }),
     );
@@ -827,7 +851,18 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     for (const key of ["tagline", "about", "email", "phone", "address", "hours", "accent", "theme"] as const) {
       if (typeof form[key] === "string") patch[key] = form[key];
     }
+    if (form.shopFields && site.tenant.kind === "shop") {
+      patch.pickup = form.pickup === "1";
+      const price = String(form.courierPrice ?? "").trim();
+      const grosze = price ? parsePrice(price) : null;
+      if (price && grosze === null) return bad(c, "Popraw pole: Kurier: cena dostawy.", back);
+      patch.courierPrice = grosze;
+      patch.bankAccount = String(form.bankAccount ?? "");
+    }
     const FIELD: Record<string, string> = {
+      courierPrice: "Kurier: cena dostawy",
+      bankAccount: "Numer konta (sprawdź cyfry, suma kontrolna się nie zgadza)",
+      pickup: "Odbiór osobisty",
       email: "E-mail kontaktowy",
       phone: "Telefon",
       accent: "Kolor przewodni",
