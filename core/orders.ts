@@ -194,6 +194,10 @@ export class Orders {
     );
   }
 
+  async countNew(): Promise<number> {
+    return (await this.db.first<{ n: number }>(`SELECT count(*) AS n FROM orders WHERE tenant_id = ?1 AND status = 'new'`))?.n ?? 0;
+  }
+
   async setStatus(id: string, status: OrderStatus): Promise<Order | null> {
     if (!ORDER_STATUSES.includes(status)) throw new ValidationError("status");
     const before = await this.get(id);

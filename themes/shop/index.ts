@@ -15,7 +15,7 @@ a{color:var(--accent)}.wrap{max-width:72rem;margin:0 auto;padding:0 1.25rem}
 .chips{display:flex;gap:.4rem;overflow-x:auto;padding:1rem 0;scrollbar-width:none}
 .chips a{flex:none;padding:.35rem .85rem;border-radius:999px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:.95rem;background:#fff}
 h2{font-size:1.25rem;margin:1.5rem 0 .75rem}
-.grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr))}
+.grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr))}
 @media(min-width:48rem){.grid{grid-template-columns:repeat(auto-fill,minmax(14rem,1fr));gap:1.25rem}}
 .card{display:flex;flex-direction:column;color:var(--ink);text-decoration:none;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#fff}
 .card:hover{border-color:var(--accent)}.card .pic{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--soft)}

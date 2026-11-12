@@ -77,6 +77,9 @@ h3.group{font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var
 padding:.85rem;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
 .cat summary.btn{list-style:none}.cat details[open] summary{border-color:var(--accent)}
 @media(max-width:40rem){.list>div{flex-wrap:wrap}.list>div>.rowlink{flex:1 1 100%}.rowlink+form{margin-left:auto}}
+.sums p{display:flex;justify-content:space-between;gap:1rem;margin:.35rem 0}.sums .total{font-weight:700;border-top:1px solid var(--line);padding-top:.5rem}
+.check{display:flex;gap:.5rem;align-items:center;margin-top:.75rem}.check input{width:1.1rem;min-height:1.1rem;margin:0}
+.msgtext{white-space:pre-wrap;overflow-wrap:anywhere}.filters .btn{text-decoration:none}
 .empty{text-align:center;color:var(--muted);padding:2rem 1rem}
 .count{display:inline-block;min-width:1.25rem;padding:0 .35rem;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.75rem;text-align:center}
 .msg{display:block!important}.msg.new{background:var(--accent-soft)}.msg p{margin:.5rem 0 .25rem;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -93,7 +96,7 @@ padding:.85rem;background:var(--card);border:1px solid var(--line);border-radius
 `;
 
 /** Bump when PANEL_CSS changes, so browsers fetch the new file. */
-export const PANEL_CSS_VERSION = "8";
+export const PANEL_CSS_VERSION = "9";
 
 const head = (title: string) => html`<meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -118,7 +121,9 @@ export interface SiteNav {
   name: string;
   publicUrl: string;
   isOwner: boolean;
-  active: "items" | "categories" | "messages" | "qr" | "settings";
+  active: "items" | "categories" | "orders" | "messages" | "qr" | "settings";
+  /** Shops only: orders waiting for the seller; undefined hides the orders tab. */
+  newOrders?: number;
   /** Unread contact form messages, shown as a badge on the tab. */
   unread: number;
 }
@@ -150,6 +155,9 @@ export function panelPage(opts: { title: string; email: string; site?: SiteNav; 
                 </div>
                 <nav class="tabs">
                   ${tab("items", `/sites/${s.id}`, "Pozycje")} ${tab("categories", `/sites/${s.id}/categories`, "Kategorie")}
+                  ${s.newOrders !== undefined
+                    ? tab("orders", `/sites/${s.id}/orders`, html`Zamówienia${s.newOrders ? html` <span class="count">${s.newOrders}</span>` : ""}`)
+                    : ""}
                   ${tab("messages", `/sites/${s.id}/messages`, html`Wiadomości${s.unread ? html` <span class="count">${s.unread}</span>` : ""}`)}
                   ${tab("qr", `/sites/${s.id}/qr`, "Kod QR")}
                   ${s.isOwner ? tab("settings", `/sites/${s.id}/settings`, "Ustawienia") : ""}
