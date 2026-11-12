@@ -1,8 +1,10 @@
 import { Hono } from "hono";
+import { html } from "hono/html";
 import {
   Media,
   cachedTenantResolver,
   forTenant,
+  itemSeoHead,
   robotsTxt,
   seoHead,
   sitemapXml,
@@ -10,6 +12,7 @@ import {
   type Platform,
   type Tenant,
 } from "../../../core";
+import { defaultPage, itemDetail } from "../../../themes/shared";
 
 type StoreEnv = { Bindings: Env; Variables: { tenant: Tenant } };
 
@@ -41,7 +44,10 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
     const tenant = c.get("tenant");
     const items = await forTenant(platform, c.env.DB, tenant.id).catalog.listItems({ status: "active" });
     const lastModified = items.reduce((max, i) => Math.max(max, i.updated_at), 0) || undefined;
-    return c.body(sitemapXml([{ url: `${new URL(c.req.url).origin}/`, lastModified }]), 200, {
+    const origin = new URL(c.req.url).origin;
+    // Item pages are linked from the shop theme only, so only shops list them.
+    const itemPages = tenant.kind === "shop" ? items.map((i) => ({ url: `${origin}/p/${encodeURIComponent(i.slug)}`, lastModified: i.updated_at })) : [];
+    return c.body(sitemapXml([{ url: `${origin}/`, lastModified }, ...itemPages]), 200, {
       "content-type": "application/xml; charset=utf-8",
     });
   });
@@ -78,6 +84,34 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
     return c.redirect("/?sent=1#kontakt", 303);
   });
 
+  const mediaUrl = (key: string, width?: number) => `/media/${encodeURI(key)}${width ? `?w=${width}` : ""}`;
+
+  app.get("/p/:slug", async (c) => {
+    const tenant = c.get("tenant");
+    const site = forTenant(platform, c.env.DB, tenant.id);
+    const [settings, item] = await Promise.all([site.settings.get(), site.catalog.getItemBySlug(c.req.param("slug"))]);
+    if (!item || item.status !== "active") return c.text("Nie znaleziono", 404);
+    const theme = platform.themes.pick(tenant.kind, settings.theme);
+    const origin = new URL(c.req.url).origin;
+    const after = await site.slot("item.after", { item }, { tenant, settings });
+    return c.html(
+      (theme.page ?? defaultPage)({
+        tenant,
+        settings,
+        title: item.name,
+        body: itemDetail({ mediaUrl }, item, html`${after}<p><a class="back" href="/">← Wszystkie produkty</a></p>`),
+        seo: itemSeoHead({
+          tenant,
+          item,
+          url: `${origin}/p/${encodeURIComponent(item.slug)}`,
+          imageUrl: item.image_key ? origin + mediaUrl(item.image_key, 1280) : undefined,
+        }),
+        slot: (name, data) => site.slot(name, data, { tenant, settings }),
+        mediaUrl,
+      }),
+    );
+  });
+
   app.get("/", async (c) => {
     const tenant = c.get("tenant");
     const site = forTenant(platform, c.env.DB, tenant.id);
@@ -88,7 +122,6 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
     ]);
     const theme = platform.themes.pick(tenant.kind, settings.theme);
     const origin = new URL(c.req.url).origin;
-    const mediaUrl = (key: string, width?: number) => `/media/${encodeURI(key)}${width ? `?w=${width}` : ""}`;
     return c.html(
       theme.home({
         tenant,

@@ -93,7 +93,7 @@ export class Catalog {
     check(input);
     await this.checkCategory(input.categoryId);
     const id = newId();
-    const slug = slugify(input.slug ?? input.name) || id;
+    const slug = await this.freeSlug(slugify(input.slug ?? input.name) || id);
     const position = input.position ?? (await this.nextPosition("items"));
     await this.db.run(
       `INSERT INTO items (tenant_id, id, kind, name, slug, description, price, currency, category_id, status, image_key, position, allergens)
@@ -210,6 +210,19 @@ export class Catalog {
     return this.db.all<Category>(
       `SELECT id, parent_id, name, slug, position FROM categories WHERE tenant_id = ?1 ORDER BY position, name`,
     );
+  }
+
+  /** Two items may share a name ("Kawa"), but each needs its own address: kawa, kawa-2, kawa-3… */
+  private async freeSlug(base: string): Promise<string> {
+    const taken = new Set(
+      (await this.db.all<{ slug: string }>(`SELECT slug FROM items WHERE tenant_id = ?1 AND (slug = ?2 OR slug LIKE ?3)`, base, `${base}-%`)).map(
+        (r) => r.slug,
+      ),
+    );
+    if (!taken.has(base)) return base;
+    let n = 2;
+    while (taken.has(`${base}-${n}`)) n++;
+    return `${base}-${n}`;
   }
 
   /** New entries go to the end of the list, so the seller's order is kept. */

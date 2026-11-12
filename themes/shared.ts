@@ -1,5 +1,5 @@
-import { html } from "hono/html";
-import type { Category, HomeView, Item } from "../core";
+import { html, raw } from "hono/html";
+import { isSoldOut, type Category, type HomeView, type Item, type PageView } from "../core";
 
 /** Helpers every theme may use. Themes stay free to look different; behaviour stays the same. */
 
@@ -44,3 +44,57 @@ export const contactForm = (v: HomeView) => html`
     <label class="trap" aria-hidden="true">Strona www<input name="website" tabindex="-1" autocomplete="off" /></label>
     <button>Wyślij wiadomość</button>
   </form>`;
+
+/** Address of an item's own page. */
+export const itemHref = (item: Item) => `/p/${encodeURIComponent(item.slug)}`;
+
+/**
+ * Item detail used by every theme's page layout: big photo, name, price, description.
+ * `after` is where the shop puts "add to cart" and modules their extras.
+ */
+export const itemDetail = (v: Pick<HomeView, "mediaUrl">, item: Item, after: unknown = "") => html`<article class="product">
+  ${item.image_key
+    ? html`<img class="product-pic" src="${v.mediaUrl(item.image_key, 1280)}"
+        srcset="${v.mediaUrl(item.image_key, 640)} 640w, ${v.mediaUrl(item.image_key, 1280)} 1280w"
+        sizes="(max-width: 48rem) 100vw, 32rem" alt="${item.name}" decoding="async" />`
+    : ""}
+  <div class="product-info">
+    <h1>${item.name}</h1>
+    <p class="product-price">${isSoldOut(item) ? html`<span class="soldout">Chwilowo niedostępne</span>` : zl(item.price)}</p>
+    ${item.description ? item.description.split(/\n\s*\n/).map((p) => html`<p class="product-desc">${p}</p>`) : ""}
+    ${after}
+  </div>
+</article>`;
+
+/** CSS for the shared components above; themes include it in their own <style>. */
+export const SHARED_CSS = `
+.product{display:grid;gap:1.5rem;align-items:start}@media(min-width:48rem){.product{grid-template-columns:1fr 1fr}}
+.product-pic{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;display:block}
+.product h1{margin:0 0 .4rem;font-size:clamp(1.5rem,4vw,2.1rem);line-height:1.15}
+.product-price{font-size:1.4rem;font-weight:700;margin:0 0 1rem;color:var(--accent)}
+.product-desc{white-space:pre-line;margin:0 0 .8rem}
+.soldout{font-size:.9rem;font-weight:700;color:#a3271a;background:#fdecea;border-radius:999px;padding:.2rem .7rem}
+.back{display:inline-block;margin:0 0 1rem}`;
+
+/** Plain layout for pages of themes that do not define their own. */
+export const defaultPage = async (v: PageView) => html`<!doctype html>
+  <html lang="pl">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width,initial-scale=1" />
+      ${v.seo}
+      <style>
+        :root{--accent:${v.settings.accent}}*{box-sizing:border-box}
+        body{margin:0;font:17px/1.55 system-ui,sans-serif;color:#1b1b1b;background:#fff}
+        header,main,footer{max-width:62rem;margin:0 auto;padding:1.25rem}header{border-bottom:3px solid var(--accent)}
+        header a{color:inherit;text-decoration:none;font-weight:700;font-size:1.2rem}a{color:var(--accent)}
+        ${raw(SHARED_CSS)}
+      </style>
+      ${await v.slot("head", {})}
+    </head>
+    <body>
+      <header><a href="/">${v.tenant.name}</a></header>
+      <main>${v.body}</main>
+      <footer>${await v.slot("footer", {})}</footer>
+    </body>
+  </html>`;
