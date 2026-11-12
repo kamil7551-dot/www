@@ -6,6 +6,8 @@ export interface CoreEvents {
   "item.updated": { item: Item };
   "item.deleted": { id: string };
   "category.created": { category: Category };
+  "category.updated": { category: Category };
+  "category.deleted": { id: string };
 }
 
 export type EventName = keyof CoreEvents;

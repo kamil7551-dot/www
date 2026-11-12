@@ -94,6 +94,7 @@ export class Catalog {
     await this.checkCategory(input.categoryId);
     const id = newId();
     const slug = slugify(input.slug ?? input.name) || id;
+    const position = input.position ?? (await this.nextPosition("items"));
     await this.db.run(
       `INSERT INTO items (tenant_id, id, kind, name, slug, description, price, currency, category_id, status, image_key, position, allergens)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
@@ -107,7 +108,7 @@ export class Catalog {
       input.categoryId ?? null,
       input.status ?? "active",
       input.imageKey ?? null,
-      input.position ?? 0,
+      position,
       cleanAllergens(input.allergens ?? []).join(","),
     );
     const item = (await this.getItem(id))!;
@@ -123,14 +124,18 @@ export class Catalog {
     return this.db.first<Item>(`SELECT ${ITEM_COLUMNS} FROM items WHERE tenant_id = ?1 AND slug = ?2`, slug);
   }
 
-  listItems(filter: { categoryId?: string; status?: ItemStatus } = {}): Promise<Item[]> {
-    return this.db.all<Item>(
+  /** `search` matches part of the name, ignoring letter case (also Polish letters). */
+  async listItems(filter: { categoryId?: string; status?: ItemStatus; search?: string } = {}): Promise<Item[]> {
+    const items = await this.db.all<Item>(
       `SELECT ${ITEM_COLUMNS} FROM items
        WHERE tenant_id = ?1 AND (?2 IS NULL OR category_id = ?2) AND (?3 IS NULL OR status = ?3)
        ORDER BY position, name`,
       filter.categoryId ?? null,
       filter.status ?? null,
     );
+    // SQLite's LIKE ignores case only for ASCII ("ż" ≠ "Ż"), so the name match runs here.
+    const needle = filter.search?.trim().toLocaleLowerCase("pl");
+    return needle ? items.filter((i) => i.name.toLocaleLowerCase("pl").includes(needle)) : items;
   }
 
   async updateItem(id: string, patch: ItemPatch): Promise<Item | null> {
@@ -191,7 +196,7 @@ export class Catalog {
       input.parentId ?? null,
       input.name.trim(),
       slugify(input.slug ?? input.name) || id,
-      input.position ?? 0,
+      input.position ?? (await this.nextPosition("categories")),
     );
     const category = (await this.db.first<Category>(
       `SELECT id, parent_id, name, slug, position FROM categories WHERE tenant_id = ?1 AND id = ?2`,
@@ -206,4 +211,79 @@ export class Catalog {
       `SELECT id, parent_id, name, slug, position FROM categories WHERE tenant_id = ?1 ORDER BY position, name`,
     );
   }
+
+  /** New entries go to the end of the list, so the seller's order is kept. */
+  private async nextPosition(table: "items" | "categories"): Promise<number> {
+    const row = await this.db.first<{ next: number }>(`SELECT coalesce(max(position) + 1, 0) AS next FROM ${table} WHERE tenant_id = ?1`);
+    return row?.next ?? 0;
+  }
+
+  /**
+   * Moves an entry one place up or down among its siblings and renumbers them 0..n-1,
+   * so old rows that all had position 0 get a stable order on the first move.
+   */
+  private async move(table: "items" | "categories", siblings: { id: string; position: number }[], id: string, direction: "up" | "down") {
+    const ids = siblings.map((x) => x.id);
+    const from = ids.indexOf(id);
+    const to = from + (direction === "up" ? -1 : 1);
+    if (from < 0 || to < 0 || to >= ids.length) return false;
+    [ids[from], ids[to]] = [ids[to]!, ids[from]!];
+    // Items keep their place relative to items of other categories by reusing the siblings' old slots.
+    const slots = siblings.map((x) => x.position).sort((a, b) => a - b);
+    const unique = slots.every((p, n) => n === 0 || p > slots[n - 1]!);
+    await this.db.batch(
+      ids.map((rowId, n): [string, ...unknown[]] => [
+        `UPDATE ${table} SET position = ?3 WHERE tenant_id = ?1 AND id = ?2`,
+        rowId,
+        unique ? slots[n] : n,
+      ]),
+    );
+    return true;
+  }
+
+  /** Moves an item within its category (that is how customers see it). */
+  async moveItem(id: string, direction: "up" | "down"): Promise<boolean> {
+    const item = await this.getItem(id);
+    if (!item) return false;
+    const siblings = (await this.listItems()).filter((i) => i.category_id === item.category_id);
+    const moved = await this.move("items", siblings, id, direction);
+    if (moved) await this.emit("item.updated", { item: (await this.getItem(id))! });
+    return moved;
+  }
+
+  async moveCategory(id: string, direction: "up" | "down"): Promise<boolean> {
+    const all = await this.listCategories();
+    const category = all.find((c) => c.id === id);
+    if (!category) return false;
+    const moved = await this.move("categories", all.filter((c) => c.parent_id === category.parent_id), id, direction);
+    if (moved) await this.emit("category.updated", { category: (await this.getCategory(id))! });
+    return moved;
+  }
+
+  getCategory(id: string): Promise<Category | null> {
+    return this.db.first<Category>(`SELECT id, parent_id, name, slug, position FROM categories WHERE tenant_id = ?1 AND id = ?2`, id);
+  }
+
+  /** Renames a category. The address (slug) stays, so links and QR codes keep working. */
+  async renameCategory(id: string, name: string): Promise<Category | null> {
+    if (!name.trim()) throw new ValidationError("Name is required");
+    const changed = await this.db.run(`UPDATE categories SET name = ?3 WHERE tenant_id = ?1 AND id = ?2`, id, name.trim());
+    if (!changed) return null;
+    const category = (await this.getCategory(id))!;
+    await this.emit("category.updated", { category });
+    return category;
+  }
+
+  /** Deletes a category; its items stay and become "without category". */
+  async deleteCategory(id: string): Promise<boolean> {
+    if (!(await this.getCategory(id))) return false;
+    await this.db.batch([
+      [`UPDATE items SET category_id = NULL, updated_at = unixepoch() WHERE tenant_id = ?1 AND category_id = ?2`, id],
+      [`UPDATE categories SET parent_id = NULL WHERE tenant_id = ?1 AND parent_id = ?2`, id],
+      [`DELETE FROM categories WHERE tenant_id = ?1 AND id = ?2`, id],
+    ]);
+    await this.emit("category.deleted", { id });
+    return true;
+  }
+
 }

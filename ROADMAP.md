@@ -21,6 +21,7 @@ Kolumna „Dla następnych” to krótka notatka dla kolejnego agenta: co warto 
 
 | Data | Agent | Co zrobiono | PR / commit | Dla następnych |
 | --- | --- | --- | --- | --- |
+| 2026-11-12 | Claude | Panel: strzałki kolejności dla kategorii i pozycji (pozycje w obrębie swojej kategorii), zmiana nazwy i usuwanie kategorii, lista pozycji pogrupowana jak na stronie, wyszukiwarka i filtry (kategoria, status, „brak dziś”) | PR `feat/core-ordering-filters` | Nowe pozycje i kategorie trafiają na koniec (`max(position)+1`). Pierwsze przesunięcie przenumerowuje rodzeństwo, więc stare wiersze z `position` 0 też działają. `TenantDb.batch` = kilka zapytań w jednej transakcji. Szukanie po nazwie jest w JS, bo LIKE w SQLite nie rozróżnia wielkości polskich liter; przy tysiącach pozycji (etap 5) przenieść do FTS. Przy aktywnych filtrach strzałki są ukryte. Nowe zdarzenia: `category.updated`, `category.deleted` |
 | 2026-11-12 | Claude | Zakładka „Kod QR” w panelu: kod do strony (własna domena, jeśli jest), pobieranie PNG i SVG, arkusz A4 do druku (1 duży albo 6 na stoliki); formularz dodawania pozycji podpowiada rodzaj według typu strony | PR `feat/qr-code` | Kod generuje `uqr` tylko po stronie serwera (0 KB JS u klienta); PNG składamy sami (`core/qr.ts`, CompressionStream). PDF = druk z przeglądarki, bez biblioteki PDF. `jsqr` jest tylko w testach i sprawdza, że kod da się zeskanować. Do zrobienia: kolejność kategorii w panelu (teraz alfabetycznie, bo wszystkie mają `position` 0) |
 | 2026-11-12 | Claude | Menu QR: szablon `qr-card` (pasek kategorii, ceny, alergeny z legendą, przekreślone dania „brak dziś”), 14 alergenów UE przy daniach, przycisk „Brak dziś” na liście pozycji w panelu | PR `feat/qr-menu` | „Brak dziś” zapisuje `sold_out_until` = północ w Polsce, więc danie wraca samo następnego dnia; sprawdzaj przez `isSoldOut()`. Alergeny trzymamy jako id (`core/allergens.ts`), numery 1–14 to kolejność z rozporządzenia, nie zmieniaj jej. Formularz pozycji wysyła `allergensShown`, żeby odznaczenie wszystkich czyściło listę |
 | 2026-11-12 | Claude | Wizytówka: szablon `business-card` (O nas, oferta, kontakt z mapą i godzinami), formularz kontaktowy z mailem do właściciela, zakładka „Wiadomości” w panelu, pole „O nas” w ustawieniach | PR `feat/business-card` | Formularz: ukryte pole `website` łapie boty (dostają „wysłano”, nic nie zapisujemy), limit 5/h na IP i 100/dobę na stronę, POST z obcej domeny = 403. Mail idzie przez `waitUntil`, więc błąd poczty nie psuje wysyłki formularza; wiadomość i tak jest w panelu. Mapa to link do Google Maps, bez osadzania (zero JS) |
@@ -63,6 +64,7 @@ Cel: jeden silnik, na którym stoją wszystkie rodzaje stron.
 - [x] Logowanie linkiem z maila, sesje, ochrona panelu (opis: docs/SECURITY.md)
 - [x] Panel: zakładanie strony, lista, dodawanie i usuwanie pozycji
 - [x] Panel: edycja pozycji, kategorie, zdjęcia, ustawienia strony i logo (tylko właściciel)
+- [x] Panel: kolejność kategorii i pozycji (strzałki), zmiana nazwy i usuwanie kategorii, wyszukiwanie i filtry listy pozycji
 - [x] Rozpoznawanie sklepu po adresie (subdomena i własna domena)
 
 ## Etap 2: Wizytówka
