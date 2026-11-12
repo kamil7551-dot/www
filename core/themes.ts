@@ -13,6 +13,8 @@ export interface HomeView {
   categories: Category[];
   /** Renders what enabled modules put in a slot. Always safe to call; returns "" when nothing is there. */
   slot: <S extends SlotName>(name: S, data: SlotData[S]) => Promise<HtmlEscapedString>;
+  /** One-off message after a form post, e.g. "sent" after the contact form. */
+  flash?: "sent" | "contact-error";
   /** Title, description, canonical, Open Graph and schema.org data. Put it inside <head>. */
   seo: HtmlEscapedString | Promise<HtmlEscapedString>;
   /** Public URL of a media key (logo, item image); with a width, a resized WebP copy. */

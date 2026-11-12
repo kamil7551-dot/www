@@ -2,6 +2,8 @@ export interface Mail {
   to: string;
   subject: string;
   text: string;
+  /** Where replies go, e.g. the visitor who filled in a contact form. */
+  replyTo?: string;
 }
 
 export interface Mailer {
@@ -26,7 +28,13 @@ export class ResendMailer implements Mailer {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ from: this.from, to: mail.to, subject: mail.subject, text: mail.text }),
+      body: JSON.stringify({
+        from: this.from,
+        to: mail.to,
+        subject: mail.subject,
+        text: mail.text,
+        ...(mail.replyTo ? { reply_to: mail.replyTo } : {}),
+      }),
     });
     if (!res.ok) throw new Error(`Mail provider answered ${res.status}`);
   }

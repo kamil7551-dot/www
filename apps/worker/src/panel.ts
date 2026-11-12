@@ -230,6 +230,8 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
       .bind(tenantId)
       .first<{ name: string; slug: string }>();
     if (!tenant) return null;
+    const api = forTenant(platform, c.env.DB, tenantId);
+    const unread = await api.inbox.unreadCount();
     const url = new URL(c.req.url);
     const nav = (active: SiteNav["active"]): SiteNav => ({
       id: tenantId,
@@ -237,8 +239,9 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
       publicUrl: `${url.protocol}//${tenant.slug}.${c.env.PLATFORM_DOMAIN}${url.port ? `:${url.port}` : ""}/`,
       isOwner: role === "owner",
       active,
+      unread: active === "messages" ? 0 : unread,
     });
-    return { tenantId, role, nav, media: new Media(c.env.MEDIA, tenantId, c.env.IMAGES), ...forTenant(platform, c.env.DB, tenantId) };
+    return { tenantId, role, nav, media: new Media(c.env.MEDIA, tenantId, c.env.IMAGES), ...api };
   }
 
   const notFound = (c: C) => c.text("Nie znaleziono", 404);
@@ -483,6 +486,50 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     return c.redirect(`${back}?ok=1`, 303);
   });
 
+  // ---------- Contact form messages: any member ----------
+
+  app.get("/sites/:site/messages", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const messages = await site.inbox.list();
+    await site.inbox.markAllRead();
+    const when = (t: number) =>
+      new Date(t * 1000).toLocaleString("pl-PL", { timeZone: "Europe/Warsaw", dateStyle: "medium", timeStyle: "short" });
+    return c.html(
+      panelPage({
+        title: "Wiadomości",
+        email: c.get("user").email,
+        site: site.nav("messages"),
+        notice: c.req.query("ok") ? notice("ok", "Usunięto.") : "",
+        body: messages.length
+          ? html`<div class="list">
+              ${messages.map(
+                (m) => html`<div class="msg ${m.read_at ? "" : "new"}">
+                  <div class="actions">
+                    <div class="grow">
+                      <div class="name">${m.name}</div>
+                      <div class="sub"><a href="mailto:${m.email}">${m.email}</a>${m.phone ? html` · <a href="tel:${m.phone}">${m.phone}</a>` : ""} · ${when(m.created_at)}</div>
+                    </div>
+                    <form method="post" action="/sites/${site.tenantId}/messages/${m.id}/delete">
+                      <button class="btn small danger">Usuń</button>
+                    </form>
+                  </div>
+                  <p>${m.message}</p>
+                </div>`,
+              )}
+            </div>`
+          : html`<div class="card empty">Tu pojawią się wiadomości z formularza kontaktowego na Twojej stronie.</div>`,
+      }),
+    );
+  });
+
+  app.post("/sites/:site/messages/:id/delete", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    await site.inbox.delete(c.req.param("id"));
+    return c.redirect(`/sites/${site.tenantId}/messages?ok=1`, 303);
+  });
+
   // ---------- Site settings: owners only ----------
 
   app.get("/sites/:site/settings", async (c) => {
@@ -503,6 +550,8 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
           <div class="card">
             <h2>O firmie</h2>
             ${field("tagline", "Krótki opis", "text", "Jedno zdanie pod nazwą, widoczne też w Google.")}
+            <label class="field"><span>O nas</span><textarea name="about" maxlength="3000" rows="5">${s.about}</textarea><span class="hint"
+                >Kilka zdań o firmie. Pusta linia zaczyna nowy akapit.</span></label>
             <div class="grid two">${field("email", "E-mail kontaktowy", "email")} ${field("phone", "Telefon", "tel")}</div>
             ${field("address", "Adres")} ${field("hours", "Godziny otwarcia", "text", "np. Pn–Pt 9–17, Sob 10–14")}
           </div>
@@ -533,7 +582,7 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     const back = `/sites/${site.tenantId}/settings`;
     const form = await c.req.parseBody();
     const patch: Record<string, unknown> = {};
-    for (const key of ["tagline", "email", "phone", "address", "hours", "accent", "theme"] as const) {
+    for (const key of ["tagline", "about", "email", "phone", "address", "hours", "accent", "theme"] as const) {
       if (typeof form[key] === "string") patch[key] = form[key];
     }
     const FIELD: Record<string, string> = {
@@ -542,6 +591,7 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
       accent: "Kolor przewodni",
       theme: "Szablon",
       tagline: "Krótki opis",
+      about: "O nas",
       address: "Adres",
       hours: "Godziny otwarcia",
     };

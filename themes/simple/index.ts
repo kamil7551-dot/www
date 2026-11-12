@@ -1,16 +1,6 @@
 import { html } from "hono/html";
-import { defineTheme, type Category, type HomeView, type Item } from "../../core";
-
-const zl = (grosze: number) => (grosze / 100).toLocaleString("pl-PL", { style: "currency", currency: "PLN" });
-
-function groups(items: Item[], categories: Category[]): { title: string; items: Item[] }[] {
-  const out = categories
-    .map((c) => ({ title: c.name, items: items.filter((i) => i.category_id === c.id) }))
-    .filter((g) => g.items.length);
-  const rest = items.filter((i) => !i.category_id || !categories.some((c) => c.id === i.category_id));
-  if (rest.length) out.push({ title: out.length ? "Pozostałe" : "", items: rest });
-  return out;
-}
+import { defineTheme, type HomeView } from "../../core";
+import { groups, telHref, zl } from "../shared";
 
 /** Default theme: one light page for every site kind. Zero JavaScript. */
 export default defineTheme({
@@ -71,7 +61,7 @@ export default defineTheme({
           <footer>
             ${s.hours ? html`<p>${s.hours}</p>` : ""}
             ${s.address ? html`<p>${s.address}</p>` : ""}
-            ${s.phone ? html`<p><a href="tel:${s.phone.replace(/[^\d+]/g, "")}">${s.phone}</a></p>` : ""}
+            ${s.phone ? html`<p><a href="${telHref(s.phone)}">${s.phone}</a></p>` : ""}
             ${s.email ? html`<p><a href="mailto:${s.email}">${s.email}</a></p>` : ""}
             ${await v.slot("footer", {})}
           </footer>

@@ -9,6 +9,7 @@ import {
   type ModuleDefinition,
   type Platform,
 } from "../../../core";
+import businessCardTheme from "../../../themes/business-card";
 import simpleTheme from "../../../themes/simple";
 import { panelApp } from "./panel";
 import { storefrontApp } from "./storefront";
@@ -28,11 +29,11 @@ export function createApp(deps: Deps = { mailer: defaultMailer }) {
   const platform: Platform = {
     bus: new EventBus(),
     modules: new ModuleRegistry().register(...(deps.modules ?? [])),
-    themes: new ThemeRegistry().register(simpleTheme),
+    themes: new ThemeRegistry().register(businessCardTheme, simpleTheme),
   };
   platform.modules.attach(platform.bus);
   const panel = panelApp(platform, deps.mailer);
-  const store = storefrontApp(platform);
+  const store = storefrontApp(platform, deps.mailer);
 
   const app = new Hono<{ Bindings: Env }>();
   app.get("/health", async (c) => {

@@ -2,6 +2,7 @@ import { Catalog } from "./catalog";
 import { TenantDb } from "./db";
 import type { CoreEvents, EventBus, EventName } from "./events";
 import type { ModuleRegistry } from "./modules";
+import { Inbox } from "./contact";
 import { Settings } from "./settings";
 import { renderSlot, type SlotContext, type SlotData, type SlotName } from "./slots";
 import type { ThemeRegistry } from "./themes";
@@ -23,7 +24,7 @@ export function forTenant(platform: Platform, d1: D1Database, tenantId: string) 
   };
   const slot = async <S extends SlotName>(name: S, data: SlotData[S], ctx: SlotContext) =>
     renderSlot(platform.modules.slotRenderers(name, await enabledModules()), data, ctx);
-  return { db, catalog: new Catalog(db, emit), settings: new Settings(db), enabledModules, slot };
+  return { db, catalog: new Catalog(db, emit), settings: new Settings(db), inbox: new Inbox(db), enabledModules, slot };
 }
 
 export { Catalog, ValidationError } from "./catalog";
@@ -34,6 +35,8 @@ export type { CoreEvents, EventName } from "./events";
 export { ModuleRegistry, defineModule } from "./modules";
 export type { ModuleDefinition } from "./modules";
 export { slugify } from "./slug";
+export { CONTACT_LIMIT_PER_IP_HOUR, Inbox } from "./contact";
+export type { ContactMessage } from "./contact";
 export { robotsTxt, safeJson, seoHead, sitemapXml } from "./seo";
 export { DEFAULT_SETTINGS, Settings, cleanSettings } from "./settings";
 export type { SiteSettings } from "./settings";
