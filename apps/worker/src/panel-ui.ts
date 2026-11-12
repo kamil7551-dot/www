@@ -69,6 +69,14 @@ padding:.6rem 1rem;min-height:2.6rem;border:1px solid var(--line);background:var
 .qr-print-card strong{font-size:1.5rem}.six .qr-print-card strong{font-size:1.1rem}.qr-print-card small{color:#555}
 .one .qr-print-card{border:0;font-size:1.3rem}
 @page{size:A4;margin:12mm}@media print{.noprint{display:none}.qr-sheet{padding:0}}
+.btn.icon{width:2rem;padding:0}.btn:disabled{opacity:.35;cursor:default}.arrows{display:flex;gap:.25rem}
+.filters{margin:0 0 1rem}.filters input{flex:2 1 12rem}
+h3.group{font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:1.25rem 0 .4rem}
+.cat{flex-wrap:wrap}.cat details{position:relative}.cat summary{list-style:none}.cat summary::-webkit-details-marker{display:none}
+.list.cats{overflow:visible}.cat .pop{position:absolute;right:0;top:calc(100% + .4rem);z-index:2;width:min(22rem,80vw);display:grid;gap:.6rem;
+padding:.85rem;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.cat summary.btn{list-style:none}.cat details[open] summary{border-color:var(--accent)}
+@media(max-width:40rem){.list>div{flex-wrap:wrap}.list>div>.rowlink{flex:1 1 100%}.rowlink+form{margin-left:auto}}
 .empty{text-align:center;color:var(--muted);padding:2rem 1rem}
 .count{display:inline-block;min-width:1.25rem;padding:0 .35rem;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.75rem;text-align:center}
 .msg{display:block!important}.msg.new{background:var(--accent-soft)}.msg p{margin:.5rem 0 .25rem;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -85,7 +93,7 @@ padding:.6rem 1rem;min-height:2.6rem;border:1px solid var(--line);background:var
 `;
 
 /** Bump when PANEL_CSS changes, so browsers fetch the new file. */
-export const PANEL_CSS_VERSION = "6";
+export const PANEL_CSS_VERSION = "8";
 
 const head = (title: string) => html`<meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />

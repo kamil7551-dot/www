@@ -29,6 +29,11 @@ export class TenantDb {
     return this.stmt(sql, params).first<T>();
   }
 
+  /** Runs several tenant-scoped statements in one transaction: all succeed or none does. */
+  async batch(statements: [sql: string, ...params: unknown[]][]): Promise<void> {
+    if (statements.length) await this.raw.batch(statements.map(([sql, ...params]) => this.stmt(sql, params)));
+  }
+
   async run(sql: string, ...params: unknown[]): Promise<number> {
     const res = await this.stmt(sql, params).run();
     return res.meta.changes;

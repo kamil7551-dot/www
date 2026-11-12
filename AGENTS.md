@@ -85,7 +85,7 @@ Zasady modułów:
 5. Teksty widoczne dla użytkownika idą przez pliki tłumaczeń (`pl` jako pierwszy język), nie są wpisane na sztywno.
 
 Zdarzenia rdzenia (pełna lista z typami w `core/events.ts`; zmiany tylko przez PR do rdzenia):
-- dostępne: `item.created`, `item.updated`, `item.deleted`, `category.created`,
+- dostępne: `item.created`, `item.updated`, `item.deleted`, `category.created`, `category.updated`, `category.deleted`,
 - planowane: `order.created`, `order.paid`, `order.shipped`, `order.cancelled`, `customer.created`, `page.render`.
 
 Sloty (miejsca na stronie, gdzie moduł dokleja treść) są opisane w `core/slots.ts`. Treść slotu buduj przez `html```` z `hono/html`; zwykły tekst zostanie zamieniony na bezpieczny tekst, nie na HTML.

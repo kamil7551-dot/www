@@ -298,8 +298,59 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
   app.get("/sites/:site", async (c) => {
     const site = await siteFor(c);
     if (!site) return notFound(c);
-    const [items, categories] = await Promise.all([site.catalog.listItems(), site.catalog.listCategories()]);
-    const catName = new Map(categories.map((x) => [x.id, x.name]));
+    const q = (c.req.query("q") ?? "").slice(0, 80);
+    const cat = c.req.query("cat") ?? "";
+    const show = c.req.query("show") ?? "";
+    const filtered = Boolean(q || cat || show);
+    const [all, categories] = await Promise.all([
+      site.catalog.listItems({ search: q || undefined, status: show in STATUS_LABEL ? (show as ItemStatus) : undefined }),
+      site.catalog.listCategories(),
+    ]);
+    const items = all.filter(
+      (i) => (show !== "soldout" || isSoldOut(i)) && (!cat || (cat === "none" ? !i.category_id : i.category_id === cat)),
+    );
+    // Same grouping as on the site, so the arrows move things where customers will see them.
+    const known = new Set(categories.map((x) => x.id));
+    const groups = [
+      ...categories.map((x) => ({ title: x.name, items: items.filter((i) => i.category_id === x.id) })),
+      { title: "Bez kategorii", items: items.filter((i) => !i.category_id || !known.has(i.category_id)) },
+    ].filter((g) => g.items.length);
+    const ret = new URL(c.req.url).search;
+    const base = `/sites/${site.tenantId}`;
+    const arrows = (i: Item, n: number, len: number) =>
+      filtered
+        ? ""
+        : html`<form method="post" action="${base}/items/${i.id}/move" class="arrows">
+            <button class="btn small icon" name="dir" value="up" ${n === 0 ? "disabled" : ""} aria-label="Przesuń wyżej: ${i.name}">↑</button>
+            <button class="btn small icon" name="dir" value="down" ${n === len - 1 ? "disabled" : ""} aria-label="Przesuń niżej: ${i.name}">↓</button>
+          </form>`;
+    const row = (i: Item, n: number, len: number) => {
+      const out = isSoldOut(i);
+      return html`<div id="i-${i.id}">
+        <a class="rowlink" href="${base}/items/${i.id}">
+          ${thumb(site.tenantId, i)}
+          <div class="grow">
+            <div class="name">${i.name}</div>
+            <div class="sub">
+              ${ITEM_KIND_LABEL[i.kind]} <span class="pill ${i.status}">${STATUS_LABEL[i.status]}</span>${out
+                ? html`<span class="pill draft">Brak dziś</span>`
+                : ""}
+            </div>
+          </div>
+          <span class="price">${zl(i.price)}</span>
+        </a>
+        ${arrows(i, n, len)}
+        ${i.kind === "dish"
+          ? html`<form method="post" action="${base}/items/${i.id}/sold-out">
+              <input type="hidden" name="soldOut" value="${out ? "0" : "1"}" />
+              <input type="hidden" name="ret" value="${ret}" />
+              <button class="btn small ${out ? "primary" : ""}">${out ? "Znów jest" : "Brak dziś"}</button>
+            </form>`
+          : ""}
+      </div>`;
+    };
+    const option = (value: string, label: string, current: string) =>
+      html`<option value="${value}" ${value === current ? "selected" : ""}>${label}</option>`;
     return c.html(
       panelPage({
         title: "Pozycje",
@@ -308,7 +359,7 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
         notice: savedNotice(c),
         body: html`<div class="card">
             <h2>Dodaj pozycję</h2>
-            <form method="post" action="/sites/${site.tenantId}/items" class="inline">
+            <form method="post" action="${base}/items" class="inline">
               <input name="name" placeholder="Nazwa" required maxlength="120" aria-label="Nazwa" />
               <input name="price" placeholder="Cena, np. 29,99" required inputmode="decimal" aria-label="Cena" />
               <select name="kind" aria-label="Rodzaj">
@@ -319,36 +370,41 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
               <button class="btn primary">Dodaj</button>
             </form>
           </div>
-          ${items.length
-            ? html`<div class="list">
-                ${items.map(
-                  (i) => {
-                    const out = isSoldOut(i);
-                    return html`<div>
-                      <a class="rowlink" href="/sites/${site.tenantId}/items/${i.id}">
-                        ${thumb(site.tenantId, i)}
-                        <div class="grow">
-                          <div class="name">${i.name}</div>
-                          <div class="sub">
-                            ${ITEM_KIND_LABEL[i.kind]}${i.category_id ? html` · ${catName.get(i.category_id) ?? ""}` : ""}
-                            <span class="pill ${i.status}">${STATUS_LABEL[i.status]}</span>${out ? html`<span class="pill draft">Brak dziś</span>` : ""}
-                          </div>
-                        </div>
-                        <span class="price">${zl(i.price)}</span>
-                      </a>
-                      ${i.kind === "dish"
-                        ? html`<form method="post" action="/sites/${site.tenantId}/items/${i.id}/sold-out">
-                            <input type="hidden" name="soldOut" value="${out ? "0" : "1"}" />
-                            <button class="btn small ${out ? "primary" : ""}">${out ? "Znów jest" : "Brak dziś"}</button>
-                          </form>`
-                        : ""}
-                    </div>`;
-                  },
-                )}
-              </div>`
-            : html`<div class="card empty">Brak pozycji. Dodaj pierwszą powyżej.</div>`}`,
+          <form method="get" action="${base}" class="inline filters" role="search">
+            <input type="search" name="q" value="${q}" placeholder="Szukaj po nazwie" aria-label="Szukaj po nazwie" />
+            <select name="cat" aria-label="Kategoria">
+              ${option("", "Wszystkie kategorie", cat)} ${categories.map((x) => option(x.id, x.name, cat))} ${option("none", "Bez kategorii", cat)}
+            </select>
+            <select name="show" aria-label="Status">
+              ${option("", "Każdy status", show)} ${(Object.keys(STATUS_LABEL) as ItemStatus[]).map((k) => option(k, STATUS_LABEL[k], show))}
+              ${option("soldout", "Brak dziś", show)}
+            </select>
+            <button class="btn">Filtruj</button>
+            ${filtered ? html`<a class="btn" href="${base}">Wyczyść</a>` : ""}
+          </form>
+          ${filtered ? html`<p class="sub">Znaleziono: ${items.length}. Kolejność zmienisz po wyczyszczeniu filtrów.</p>` : ""}
+          ${groups.length
+            ? groups.map(
+                (g) => html`${categories.length ? html`<h3 class="group">${g.title}</h3>` : ""}
+                  <div class="list">${g.items.map((i, n) => row(i, n, g.items.length))}</div>`,
+              )
+            : html`<div class="card empty">${filtered ? "Nic nie pasuje do filtrów." : "Brak pozycji. Dodaj pierwszą powyżej."}</div>`}`,
       }),
     );
+  });
+
+  /** Only a plain query string (from our own filter form) is accepted as a place to return to. */
+  const backToList = (siteId: string, ret: unknown, anchor = "") =>
+    `/sites/${siteId}${typeof ret === "string" && /^\?[\w=&%+.-]*$/.test(ret) ? ret : ""}${anchor}`;
+
+  app.post("/sites/:site/items/:item/move", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const form = await c.req.parseBody();
+    const id = c.req.param("item");
+    if (!(await site.catalog.getItem(id))) return notFound(c);
+    await site.catalog.moveItem(id, form.dir === "up" ? "up" : "down");
+    return c.redirect(`/sites/${site.tenantId}#i-${id}`, 303);
   });
 
   app.post("/sites/:site/items", async (c) => {
@@ -475,7 +531,7 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     const form = await c.req.parseBody();
     const item = await site.catalog.setSoldOut(c.req.param("item"), form.soldOut === "1");
     if (!item) return notFound(c);
-    return c.redirect(`/sites/${site.tenantId}?ok=1`, 303);
+    return c.redirect(backToList(site.tenantId, form.ret, `#i-${item.id}`), 303);
   });
 
   app.post("/sites/:site/items/:item/delete", async (c) => {
@@ -505,10 +561,33 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
             </form>
           </div>
           ${categories.length
-            ? html`<div class="list">
-                ${categories.map(
-                  (x) => html`<div><div class="grow"><div class="name">${x.name}</div></div><span class="sub">${count(x.id)} poz.</span></div>`,
-                )}
+            ? html`<div class="list cats">
+                ${categories.map((x, n) => {
+                  const url = `/sites/${site.tenantId}/categories/${x.id}`;
+                  return html`<div id="c-${x.id}" class="cat">
+                    <div class="grow">
+                      <div class="name">${x.name}</div>
+                      <span class="sub">${count(x.id)} poz.</span>
+                    </div>
+                    <form method="post" action="${url}/move" class="arrows">
+                      <button class="btn small icon" name="dir" value="up" ${n === 0 ? "disabled" : ""} aria-label="Przesuń wyżej: ${x.name}">↑</button>
+                      <button class="btn small icon" name="dir" value="down" ${n === categories.length - 1 ? "disabled" : ""} aria-label="Przesuń niżej: ${x.name}">↓</button>
+                    </form>
+                    <details>
+                      <summary class="btn small">Zmień</summary>
+                      <div class="pop">
+                        <form method="post" action="${url}" class="inline">
+                          <input name="name" value="${x.name}" required maxlength="80" aria-label="Nowa nazwa" />
+                          <button class="btn small primary">Zapisz</button>
+                        </form>
+                        <form method="post" action="${url}/delete">
+                          <button class="btn small danger">Usuń kategorię</button>
+                          <span class="hint">Pozycje zostaną, tylko bez kategorii.</span>
+                        </form>
+                      </div>
+                    </details>
+                  </div>`;
+                })}
               </div>`
             : html`<div class="card empty">Kategorie pomagają klientom szybko znaleźć to, czego szukają.</div>`}`,
       }),
@@ -528,6 +607,37 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
       throw error;
     }
     return c.redirect(`${back}?ok=1`, 303);
+  });
+
+  app.post("/sites/:site/categories/:cat/move", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const form = await c.req.parseBody();
+    const id = c.req.param("cat");
+    if (!(await site.catalog.getCategory(id))) return notFound(c);
+    await site.catalog.moveCategory(id, form.dir === "up" ? "up" : "down");
+    return c.redirect(`/sites/${site.tenantId}/categories#c-${id}`, 303);
+  });
+
+  app.post("/sites/:site/categories/:cat", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    const back = `/sites/${site.tenantId}/categories`;
+    const form = await c.req.parseBody();
+    try {
+      if (!(await site.catalog.renameCategory(c.req.param("cat"), String(form.name ?? "").slice(0, 80)))) return notFound(c);
+    } catch (error) {
+      if (error instanceof ValidationError) return bad(c, "Podaj nazwę kategorii.", back);
+      throw error;
+    }
+    return c.redirect(`${back}?ok=1`, 303);
+  });
+
+  app.post("/sites/:site/categories/:cat/delete", async (c) => {
+    const site = await siteFor(c);
+    if (!site) return notFound(c);
+    if (!(await site.catalog.deleteCategory(c.req.param("cat")))) return notFound(c);
+    return c.redirect(`/sites/${site.tenantId}/categories?ok=1`, 303);
   });
 
   // ---------- Contact form messages: any member ----------
