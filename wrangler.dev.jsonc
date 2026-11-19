@@ -1,0 +1,23 @@
+// Dev deployment: one Worker on workers.dev, no D1/R2 and no domain (see docs/DEV.md).
+// Deploy: npx wrangler deploy -c wrangler.dev.jsonc
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "www-dev",
+  "main": "apps/worker/src/dev.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": {
+    // Virtual domain the app runs on internally; the public address is the workers.dev one.
+    "PLATFORM_DOMAIN": "dev.invalid",
+    "SINGLE_HOST": "1",
+    // Mini CRM for now: business cards and QR menus. Add ",shop" to allow shops.
+    "SITE_KINDS": "business-card,qr-menu"
+  },
+  "durable_objects": { "bindings": [{ "name": "DEV_DB", "class_name": "DevDatabase" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DevDatabase"] }],
+  // Fill in the id of the KV namespace created for dev images (see docs/DEV.md).
+  "kv_namespaces": [{ "binding": "DEV_MEDIA", "id": "00000000000000000000000000000000" }]
+}

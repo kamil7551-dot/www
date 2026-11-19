@@ -24,6 +24,7 @@ import { privacyPage, termsPage, withdrawalPage } from "../../../themes/legal";
 import { addToCart, cartPage, checkoutPage, orderMails, orderPage } from "../../../themes/shop-pages";
 import { categoryHref, listingPage } from "../../../themes/listing";
 import { defaultPage, itemDetail } from "../../../themes/shared";
+import { PUBLIC_ORIGIN_HEADER, singleHostBehind, toPublic } from "./hosts";
 import { cartCount, changeCart, readCart, writeCart } from "./cart";
 
 type StoreEnv = { Bindings: Env; Variables: { tenant: Tenant } };
@@ -301,8 +302,9 @@ export function storefrontApp(platform: Platform, mailer: (env: Env) => Mailer) 
     const { order, key } = placed;
     writeCart(c, []);
     const url = new URL(c.req.url);
-    const orderUrl = `${url.origin}/order/${order.id}?k=${key}`;
-    const panelUrl = `${url.protocol}//panel.${c.env.PLATFORM_DOMAIN}${url.port ? `:${url.port}` : ""}/sites/${tenant.id}/orders/${order.id}`;
+    const external = (u: string) => toPublic(singleHostBehind(c.env, c.req.header(PUBLIC_ORIGIN_HEADER)), u);
+    const orderUrl = external(`${url.origin}/order/${order.id}?k=${key}`);
+    const panelUrl = external(`${url.protocol}//panel.${c.env.PLATFORM_DOMAIN}${url.port ? `:${url.port}` : ""}/sites/${tenant.id}/orders/${order.id}`);
     const mails = orderMails(order, settings, tenant.name, orderUrl, panelUrl);
     const send = mailer(c.env);
     // The order is saved; a mail provider hiccup must not turn it into an error page.
