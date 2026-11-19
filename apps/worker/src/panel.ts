@@ -27,6 +27,7 @@ import {
 } from "../../../core";
 import { parsePrice, zl } from "./layout";
 import { orderRoutes } from "./panel-orders";
+import { PUBLIC_ORIGIN_HEADER, singleHostBehind, toPublic } from "./hosts";
 import { PANEL_CSS, PANEL_CSS_VERSION, authPage, notice, panelPage, type SiteNav } from "./panel-ui";
 
 export const SESSION_COOKIE = "__Host-sid";
@@ -46,6 +47,13 @@ const SECURITY_HEADERS: Record<string, string> = {
 };
 
 const KIND_LABEL: Record<SiteKind, string> = { shop: "Sklep", "business-card": "Wizytówka", "qr-menu": "Menu QR" };
+const KIND_HINT: Record<SiteKind, string> = { shop: "produkty i zamówienia", "business-card": "firma, usługi, kontakt", "qr-menu": "karta dań do stolika" };
+
+/** Compares two secrets in constant time (via their hashes, so lengths do not leak either). */
+async function sameSecret(a: string, b: string): Promise<boolean> {
+  const [x, y] = await Promise.all([a, b].map((v) => crypto.subtle.digest("SHA-256", new TextEncoder().encode(v))));
+  return crypto.subtle.timingSafeEqual(x!, y!);
+}
 const ITEM_KIND_LABEL: Record<ItemKind, string> = { product: "Produkt", service: "Usługa", dish: "Danie" };
 const STATUS_LABEL: Record<ItemStatus, string> = { active: "Widoczna", hidden: "Ukryta", draft: "Szkic" };
 
@@ -54,6 +62,17 @@ const priceField = (grosze: number) => (grosze / 100).toFixed(2).replace(".", ",
 
 export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
   const app = new Hono<PanelEnv>();
+
+  /** An address as the visitor's browser sees it (differs from the internal one only on dev). */
+  const external = (c: C, url: string) => toPublic(singleHostBehind(c.env, c.req.header(PUBLIC_ORIGIN_HEADER)), url);
+  /** Site kinds that can be created here; dev limits them with SITE_KINDS. */
+  const allowedKinds = (c: C): SiteKind[] => {
+    const list = (c.env as Env & { SITE_KINDS?: string }).SITE_KINDS;
+    const all: SiteKind[] = ["business-card", "qr-menu", "shop"];
+    return list ? all.filter((k) => list.split(",").map((x) => x.trim()).includes(k)) : all;
+  };
+  /** Dev only: a shared password replaces the e-mail link, so dev needs no mail provider. */
+  const devPassword = (c: C) => (c.env as Env & { DEV_LOGIN_PASSWORD?: string }).DEV_LOGIN_PASSWORD || null;
 
   app.use("*", async (c, next) => {
     // Cross-site form posts are refused: a POST must come from the panel's own pages.
@@ -79,10 +98,15 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
       authPage(
         "Logowanie",
         html`<h1>Zaloguj się</h1>
-          <p>Podaj e-mail, a wyślemy Ci link do logowania. Bez hasła.</p>
+          ${devPassword(c)
+            ? html`<p>Wersja testowa: podaj e-mail i hasło testowe.</p>`
+            : html`<p>Podaj e-mail, a wyślemy Ci link do logowania. Bez hasła.</p>`}
           <form method="post" action="/login">
             <label class="field"><span>E-mail</span><input type="email" name="email" required autocomplete="email" autofocus /></label>
-            <button class="btn primary block">Wyślij link</button>
+            ${devPassword(c)
+              ? html`<label class="field"><span>Hasło testowe</span><input type="password" name="password" required autocomplete="current-password" /></label>`
+              : ""}
+            <button class="btn primary block">${devPassword(c) ? "Zaloguj" : "Wyślij link"}</button>
           </form>`,
       ),
     ),
@@ -92,8 +116,20 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     const form = await c.req.parseBody();
     const ip = c.req.header("cf-connecting-ip") ?? "unknown";
     const result = await auth.requestLogin(c.env.DB, String(form.email ?? ""), ip);
+    const password = devPassword(c);
+    if (password) {
+      // Checked after requestLogin, so wrong guesses count towards its per-e-mail and per-IP limits.
+      if (!result.ok || !(await sameSecret(String(form.password ?? ""), password))) {
+        const message = result.ok ? "Złe hasło testowe." : "Za dużo prób albo zły e-mail. Spróbuj za kwadrans.";
+        return c.html(
+          authPage("Logowanie", html`<h1>Nie udało się</h1><p>${message}</p><a class="btn block" href="/login">Spróbuj jeszcze raz</a>`),
+          400,
+        );
+      }
+      return c.redirect(`/login/verify?t=${result.token}`, 303);
+    }
     if (result.ok) {
-      const link = `${new URL(c.req.url).origin}/login/verify?t=${result.token}`;
+      const link = external(c, `${new URL(c.req.url).origin}/login/verify?t=${result.token}`);
       try {
         await mailer(c.env).send({
           to: result.email,
@@ -192,9 +228,12 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
             <h2>Nowa strona</h2>
             <form method="post" action="/sites">
               <div class="kinds">
-                <label><input type="radio" name="kind" value="business-card" required />Wizytówka<small>firma, usługi, kontakt</small></label>
-                <label><input type="radio" name="kind" value="qr-menu" />Menu QR<small>karta dań do stolika</small></label>
-                <label><input type="radio" name="kind" value="shop" checked />Sklep<small>produkty i zamówienia</small></label>
+                ${allowedKinds(c).map(
+                  (k, n, list) =>
+                    html`<label><input type="radio" name="kind" value="${k}" required ${n === list.length - 1 ? "checked" : ""} />${KIND_LABEL[k]}<small
+                        >${KIND_HINT[k]}</small
+                      ></label>`,
+                )}
               </div>
               <div class="inline">
                 <input name="name" placeholder="Nazwa, np. Serwis Laptopów Kowalski" required maxlength="80" />
@@ -210,7 +249,7 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
     const form = await c.req.parseBody();
     const name = String(form.name ?? "").trim().slice(0, 80);
     const kind = String(form.kind ?? "");
-    if (!name || !(kind in KIND_LABEL)) return bad(c, "Podaj nazwę i wybierz rodzaj strony.");
+    if (!name || !allowedKinds(c).includes(kind as SiteKind)) return bad(c, "Podaj nazwę i wybierz rodzaj strony.");
     let slug = slugify(name) || "strona";
     if (RESERVED_SLUGS.has(slug)) slug = `${slug}-1`;
     const taken = await c.env.DB.prepare("SELECT 1 FROM tenants WHERE slug = ?1").bind(slug).first();
@@ -243,7 +282,7 @@ export function panelApp(platform: Platform, mailer: (env: Env) => Mailer) {
       tenant.kind === "shop" ? api.orders.countNew() : Promise.resolve(undefined),
     ]);
     const url = new URL(c.req.url);
-    const publicUrl = `${url.protocol}//${tenant.slug}.${c.env.PLATFORM_DOMAIN}${url.port ? `:${url.port}` : ""}/`;
+    const publicUrl = external(c, `${url.protocol}//${tenant.slug}.${c.env.PLATFORM_DOMAIN}${url.port ? `:${url.port}` : ""}/`);
     const nav = (active: SiteNav["active"]): SiteNav => ({
       id: tenantId,
       name: tenant.name,

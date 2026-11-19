@@ -60,7 +60,7 @@ padding:.6rem 1rem;min-height:2.6rem;border:1px solid var(--line);background:var
 .actions{display:flex;gap:.5rem;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:.5rem}
 .note{border-radius:8px;padding:.7rem .9rem;margin-bottom:1rem;font-weight:500}
 .note.ok{background:var(--ok-soft);color:var(--ok)}.note.err{background:var(--danger-soft);color:var(--danger)}
-.qr-card{display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start}.qr-card .qr{width:12rem;flex:none}
+.qr-card{display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start}.qr-card .qr{width:12rem;flex:none}.qr-card>div:not(.qr){min-width:0;flex:1 1 14rem}.qr-card a{overflow-wrap:anywhere}
 .qr svg{display:block;width:100%;height:auto}.qr-card .inline{margin:.75rem 0}
 .qr-sheet{background:#fff;color:#000;padding:1rem}.qr-sheet main{display:grid;gap:0;margin:0 auto}
 .qr-sheet .one{max-width:150mm}.qr-sheet .six{grid-template-columns:1fr 1fr;max-width:190mm}
@@ -96,7 +96,7 @@ padding:.85rem;background:var(--card);border:1px solid var(--line);border-radius
 `;
 
 /** Bump when PANEL_CSS changes, so browsers fetch the new file. */
-export const PANEL_CSS_VERSION = "9";
+export const PANEL_CSS_VERSION = "10";
 
 const head = (title: string) => html`<meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />

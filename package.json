@@ -9,9 +9,11 @@
   "scripts": {
     "dev": "wrangler dev",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "typecheck": "wrangler types >/dev/null && tsc --noEmit",
+    "typecheck": "wrangler types >/dev/null && tsc --noEmit && node scripts/dev-migrations.mjs --check",
+    "dev:migrations": "node scripts/dev-migrations.mjs",
+    "deploy:dev": "wrangler deploy -c wrangler.dev.jsonc",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run && vitest run -c vitest.dev.config.ts",
     "types": "wrangler types",
     "pretest": "wrangler types >/dev/null"
   },
