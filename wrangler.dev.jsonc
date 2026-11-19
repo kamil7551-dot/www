@@ -18,6 +18,6 @@
   },
   "durable_objects": { "bindings": [{ "name": "DEV_DB", "class_name": "DevDatabase" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DevDatabase"] }],
-  // Fill in the id of the KV namespace created for dev images (see docs/DEV.md).
-  "kv_namespaces": [{ "binding": "DEV_MEDIA", "id": "00000000000000000000000000000000" }]
+  // KV namespace www-dev-media (dev images), created 2026-11-19.
+  "kv_namespaces": [{ "binding": "DEV_MEDIA", "id": "b471b36197704d53a4623afa31175cd2" }]
 }

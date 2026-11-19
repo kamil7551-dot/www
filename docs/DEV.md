@@ -19,7 +19,7 @@ Potrzebny token Cloudflare z prawem do Workers Scripts i Workers KV. D1 i R2 nie
 ```sh
 export CLOUDFLARE_ACCOUNT_ID=<id konta>
 # 1. Raz: magazyn na zdjęcia. Wpisz zwrócone id do wrangler.dev.jsonc (kv_namespaces[0].id).
-npx wrangler kv namespace create www-dev-media
+npx wrangler kv namespace create www-dev-media   # już utworzone 2026-11-19, id w wrangler.dev.jsonc
 # 2. Wdrożenie (za każdym razem, z gałęzi main):
 pnpm install --frozen-lockfile
 npx wrangler deploy -c wrangler.dev.jsonc
